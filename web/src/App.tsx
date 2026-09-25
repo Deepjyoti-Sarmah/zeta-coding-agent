@@ -2,8 +2,9 @@ import "./App.css";
 import { InstallTabs } from "./components/InstallTabs";
 import { ThemeToggle } from "./components/ThemeToggle";
 
-const GITHUB = "https://github.com/huggingface/zeta";
-const DOCS = "https://zeta.dev";
+const GITHUB = "https://github.com/Deepjyoti-Sarmah/zeta-coding-agent";
+const DOCS = `${GITHUB}#readme`;
+const ROADMAP = `${GITHUB}/issues`;
 
 function App() {
   return (
@@ -20,7 +21,7 @@ function App() {
           </div>
           <div className="navlinks">
             <a href={DOCS}>Docs</a>
-            <a href={`${GITHUB}/issues/1`}>Roadmap</a>
+            <a href={ROADMAP}>Roadmap</a>
             <a href="#start">Getting started</a>
             <a className="gh" href={GITHUB}>
               GitHub &#8599;
@@ -232,7 +233,7 @@ function App() {
           <div className="l">
             <a href={DOCS}>Docs</a>
             <a href={GITHUB}>GitHub</a>
-            <a href={`${GITHUB}/issues/1`}>Roadmap</a>
+            <a href={ROADMAP}>Roadmap</a>
           </div>
           <span>A teaching project &middot; inspired by Pi</span>
         </footer>

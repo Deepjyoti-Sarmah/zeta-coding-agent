@@ -22,27 +22,35 @@ export function InstallTabs() {
   }
 
   return (
-    <div className="install-block">
-      <div className="install-tabs" role="tablist" aria-label="Install command">
-        {OPTIONS.map((o) => (
+    <div className="install-wrap">
+      <span className="install-label">Install</span>
+      <div className="install-block">
+        <div className="install-tabs" role="tablist" aria-label="Package manager">
+          {OPTIONS.map((o) => (
+            <button
+              key={o.id}
+              role="tab"
+              aria-selected={o.id === active}
+              onClick={() => setActive(o.id)}
+              type="button"
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <div className="install-row">
+          <span className="install-cmd">
+            <span className="dollar">$</span> {option.cmd}
+          </span>
           <button
-            key={o.id}
-            role="tab"
-            aria-selected={o.id === active}
-            onClick={() => setActive(o.id)}
+            className="copy"
             type="button"
+            aria-label="Copy install command"
+            onClick={copy}
           >
-            {o.label}
+            {copied ? "copied ✓" : "copy"}
           </button>
-        ))}
-      </div>
-      <div className="install-row">
-        <span>
-          <span className="dollar">$</span> {option.cmd}
-        </span>
-        <button className="copy" type="button" aria-label="Copy install command" onClick={copy}>
-          {copied ? "copied" : "copy"}
-        </button>
+        </div>
       </div>
     </div>
   );

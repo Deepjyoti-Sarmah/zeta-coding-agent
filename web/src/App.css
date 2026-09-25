@@ -62,13 +62,15 @@ nav {
   position: relative;
   z-index: 3;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  padding: 26px 0 0;
+  padding: 22px 0;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
 }
 .brand .glyph {
@@ -90,15 +92,19 @@ nav {
   color: var(--ink-soft);
   border: 1px solid var(--grid-strong);
   border-radius: 2px;
-  padding: 1px 6px;
-  transform: translateY(-2px);
+  padding: 2px 6px;
+  line-height: 1.3;
 }
 .navlinks {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 24px;
   font-family: var(--grotesk);
   font-size: 14.5px;
+}
+.navlinks a {
+  display: inline-flex;
+  align-items: center;
 }
 .navlinks a {
   color: var(--ink-soft);
@@ -115,10 +121,12 @@ nav {
 
 .theme-toggle {
   display: inline-flex;
+  align-items: center;
   border: 1px solid var(--grid-strong);
   border-radius: 999px;
   padding: 2px;
   gap: 2px;
+  margin-left: 4px;
 }
 .theme-toggle button {
   font-family: var(--grotesk);
@@ -193,16 +201,35 @@ h1 em {
 }
 
 /* ---- install tabs ---- */
+.install-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.hero-center .install-wrap {
+  align-items: center;
+}
+.install-label {
+  font-family: var(--grotesk);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
 .install-block {
   display: inline-flex;
   flex-direction: column;
   font-family: var(--mono);
   font-size: 14.5px;
-  background: var(--ink);
-  color: var(--ground);
+  /* Fixed dark chrome regardless of site theme — this is a terminal, not a
+     themed surface, so its text must never depend on --ground. */
+  background: #0e1a30;
+  color: #d7e0f4;
   border-radius: 4px;
   overflow: hidden;
-  min-width: 300px;
+  min-width: 320px;
 }
 :root[data-theme="dark"] .install-block {
   background: #050a14;
@@ -216,6 +243,7 @@ h1 em {
   display: flex;
   gap: 2px;
   padding: 6px 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .install-tabs button {
   font-family: var(--grotesk);
@@ -237,23 +265,32 @@ h1 em {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 13px 18px;
+  padding: 13px 16px 13px 18px;
+}
+.install-cmd {
+  color: #d7e0f4;
+  white-space: nowrap;
+  overflow-x: auto;
 }
 .install-row .dollar {
   color: var(--red);
 }
 .install-row .copy {
+  flex: none;
   margin-left: auto;
+  padding-left: 14px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
   font-family: var(--grotesk);
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   transition: color 0.2s;
   background: none;
-  border: none;
-  padding: 0;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
 }
 .install-row .copy:hover {
   color: #fff;
