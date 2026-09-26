@@ -3647,7 +3647,12 @@ class ZetaTuiApp(App[None]):
             prompt.move_cursor(_text_end_location(applied_completion))
             self._completion_state = self._build_completion_state(applied_completion)
             self._refresh_completions()
-            return
+            # Enter should execute a complete slash command even when the
+            # autocomplete replacement only normalizes its spelling. Keep the
+            # completion-only behavior for prefixes such as `/th`.
+            if not _is_complete_slash_command(applied_completion, self.session):
+                return
+            raw_text = applied_completion
 
         text = raw_text.strip()
         if not text:
@@ -6179,6 +6184,17 @@ def _filter_model_choices(choices: Sequence[ModelChoice], query: str) -> tuple[M
         for choice in choices
         if normalized in choice.provider_name.lower() or normalized in choice.model.lower()
     )
+
+
+def _is_complete_slash_command(text: str, session: CodingSession) -> bool:
+    """Return whether text names a registered command rather than a prefix."""
+    stripped = text.strip()
+    if not stripped.startswith("/") or stripped.startswith("//"):
+        return False
+    name = stripped[1:].split(None, 1)[0]
+    if not name or ":" in name:
+        return False
+    return _session_command_registry(session).get(name) is not None
 
 
 def _command_message_uses_transcript(command_text: str) -> bool:
