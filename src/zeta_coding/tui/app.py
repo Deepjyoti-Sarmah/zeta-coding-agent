@@ -702,7 +702,11 @@ class PromptInput(TextArea):
         bindings), so there is no interceptor splice here.
         """
         keybindings = self.tui_keybindings
-        if event.key == keybindings.queue_follow_up:
+        if event.key == "ctrl+c":
+            event.stop()
+            event.prevent_default()
+            await self.action_quit()
+        elif event.key == keybindings.queue_follow_up:
             event.stop()
             event.prevent_default()
             await self._completion_target().action_submit_follow_up()
@@ -6313,6 +6317,7 @@ def _key_hint(key: str) -> str:
 
 def _app_bindings(keybindings: TuiKeybindings) -> list[Binding]:
     return [
+        Binding("ctrl+c", "quit", "Quit", priority=True),
         Binding(keybindings.cancel, "cancel", "Cancel"),
         Binding(keybindings.command_palette, "open_command_palette", "Commands"),
         Binding(keybindings.session_picker, "open_session_picker", "Sessions"),

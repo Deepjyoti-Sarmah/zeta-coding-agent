@@ -61,8 +61,8 @@ class TuiKeybindings:
     model_cycle: str = "ctrl+p"
     toggle_thinking: str = "ctrl+t"
     toggle_tool_results: str = "ctrl+o"
-    copy_message: str = "ctrl+c"
-    quit: str = "ctrl+d"
+    copy_message: str = "ctrl+shift+c"
+    quit: str = "ctrl+c"
 
     def to_json(self) -> dict[str, str]:
         """Serialize these keybindings to JSON-compatible data."""
