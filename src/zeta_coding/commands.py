@@ -114,6 +114,7 @@ class CommandResult:
     logout_picker_requested: bool = False
     logout_provider: str | None = None
     model_picker_requested: bool = False
+    model_catalog_refresh_requested: bool = False
     tools_picker_requested: bool = False
     scoped_models_picker_requested: bool = False
     skills_picker_requested: bool = False
@@ -336,6 +337,14 @@ def create_default_command_registry() -> CommandRegistry:
             usage="/model",
             description="Choose the active model.",
             handler=_model_command,
+        )
+    )
+    registry.register(
+        SlashCommand(
+            name="models",
+            usage="/models",
+            description="Refresh provider model catalogs.",
+            handler=_models_command,
         )
     )
     registry.register(
@@ -631,6 +640,12 @@ def _model_command(context: CommandContext) -> CommandResult:
         return CommandResult(handled=True, message=f"Current model: {model}")
 
     return CommandResult(handled=True, model_picker_requested=True)
+
+
+def _models_command(context: CommandContext) -> CommandResult:
+    if context.args:
+        return CommandResult(handled=True, message="Usage: /models")
+    return CommandResult(handled=True, model_catalog_refresh_requested=True)
 
 
 def _scoped_models_command(context: CommandContext) -> CommandResult:

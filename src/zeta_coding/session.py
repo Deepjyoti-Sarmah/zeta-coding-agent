@@ -41,6 +41,7 @@ from zeta_agent.tools import AgentTool
 from zeta_agent.types import JSONValue
 from zeta_ai.model_limits import ModelLimitsProvider, RuntimeModelLimits
 from zeta_coding.branch_summary import summarize_branch_messages_with_model
+from zeta_coding.model_discovery import DiscoverySummary, ModelDiscoveryService
 from zeta_coding.commands import CommandRegistry, CommandResult, create_default_command_registry
 from zeta_coding.context import discover_project_context_with_diagnostics
 from zeta_coding.context_window import (
@@ -1253,6 +1254,12 @@ class CodingSession:
         if self._config.command_registry is None:
             self._command_registry = self._extension_runtime.build_command_registry()
         self._extension_runtime.attach_harness_listener(self._harness.subscribe)
+
+    async def refresh_model_catalogs(self) -> DiscoverySummary:
+        """Explicitly refresh configured provider model catalogs."""
+        if self._provider_settings is None:
+            raise ProviderConfigError("Provider settings are not available")
+        return await ModelDiscoveryService().refresh(self._provider_settings.providers)
 
     def reload_provider_settings(self) -> None:
         """Reload provider settings for login and model-selection flows."""
