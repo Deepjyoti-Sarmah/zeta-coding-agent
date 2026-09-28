@@ -41,6 +41,7 @@ from zeta_agent.tools import AgentTool
 from zeta_agent.types import JSONValue
 from zeta_ai.model_limits import ModelLimitsProvider, RuntimeModelLimits
 from zeta_coding.branch_summary import summarize_branch_messages_with_model
+from zeta_coding.model_catalog_cache import ModelCatalogCache, ModelCatalogCacheError
 from zeta_coding.model_discovery import DiscoverySummary, ModelDiscoveryService
 from zeta_coding.commands import CommandRegistry, CommandResult, create_default_command_registry
 from zeta_coding.context import discover_project_context_with_diagnostics
@@ -447,7 +448,7 @@ class CodingSession:
             return (self.model,)
         if not self._provider_is_usable(provider):
             return ()
-        return provider.models
+        return self._models_for_provider(provider)
 
     @property
     def available_model_choices(self) -> tuple[ModelChoice, ...]:
@@ -457,7 +458,7 @@ class CodingSession:
         return tuple(
             ModelChoice(provider_name=provider.name, model=model)
             for provider in self._usable_provider_configs()
-            for model in provider.models
+            for model in self._models_for_provider(provider)
         )
 
     @property
@@ -1972,10 +1973,25 @@ class CodingSession:
         )
 
     def _provider_is_usable(self, provider: ProviderConfig) -> bool:
+        if provider.name in {"ollama", "lm-studio"}:
+            try:
+                cached = ModelCatalogCache().load().get(provider.name)
+            except ModelCatalogCacheError:
+                return False
+            return cached is not None and cached.status == "ready"
         return provider_has_usable_credentials(
             provider,
             credential_reader=self._credential_store,
         )
+
+    def _models_for_provider(self, provider: ProviderConfig) -> tuple[str, ...]:
+        try:
+            cached = ModelCatalogCache().load().get(provider.name)
+        except ModelCatalogCacheError:
+            cached = None
+        if cached is not None and cached.status == "ready" and cached.models:
+            return cached.models
+        return provider.models
 
     def _usable_provider_configs(self) -> tuple[ProviderConfig, ...]:
         if self._provider_settings is None:
