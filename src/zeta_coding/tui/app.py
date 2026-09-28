@@ -2325,6 +2325,7 @@ class ModelPickerScreen(ModalScreen[ModelChoice | None]):
         current_model: str,
         provider_name: str,
         theme: TuiTheme,
+        unavailable_providers: Sequence[tuple[str, str, str]] = (),
         on_toggle_scoped: Callable[[ModelChoice], Sequence[ModelChoice]] | None = None,
         picker_kind: Literal["model", "scoped"] = "model",
     ) -> None:
@@ -2335,6 +2336,7 @@ class ModelPickerScreen(ModalScreen[ModelChoice | None]):
         self.current_model = current_model
         self.provider_name = provider_name
         self.theme = theme
+        self.unavailable_providers = tuple(unavailable_providers)
         self.on_toggle_scoped = on_toggle_scoped
         self.picker_kind = picker_kind
         self.mode: Literal["all", "scoped"] = "all"
@@ -2348,6 +2350,14 @@ class ModelPickerScreen(ModalScreen[ModelChoice | None]):
             )
             yield Static(title, id="model-picker-title")
             yield Static("", id="model-picker-tabs")
+            if self.unavailable_providers:
+                yield Static(
+                    "\n".join(
+                        f"{name} [{status}] {message}".rstrip()
+                        for name, status, message in self.unavailable_providers
+                    ),
+                    id="model-picker-unavailable",
+                )
             yield ModelPickerSearchInput(placeholder="Search models", id="model-picker-search")
             yield ListView(
                 *[
@@ -5400,6 +5410,9 @@ class ZetaTuiApp(App[None]):
                 current_model=self.session.model,
                 provider_name=self.session.provider_name,
                 theme=self.tui_settings.resolved_theme,
+                unavailable_providers=tuple(
+                    getattr(self.session, "provider_catalog_statuses", ())
+                ),
                 on_toggle_scoped=None,
                 picker_kind="model",
             ),
@@ -5421,6 +5434,9 @@ class ZetaTuiApp(App[None]):
                 current_model=self.session.model,
                 provider_name=self.session.provider_name,
                 theme=self.tui_settings.resolved_theme,
+                unavailable_providers=tuple(
+                    getattr(self.session, "provider_catalog_statuses", ())
+                ),
                 on_toggle_scoped=self._toggle_scoped_model,
                 picker_kind="scoped",
             ),

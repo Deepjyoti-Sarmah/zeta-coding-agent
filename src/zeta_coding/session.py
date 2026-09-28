@@ -438,6 +438,27 @@ class CodingSession:
         return tuple(provider.name for provider in self._usable_provider_configs())
 
     @property
+    def provider_catalog_statuses(self) -> tuple[tuple[str, str, str], ...]:
+        """Return configured providers and their latest discovery status."""
+        if self._provider_settings is None:
+            return ()
+        try:
+            cached = ModelCatalogCache().load()
+        except ModelCatalogCacheError:
+            cached = {}
+        statuses: list[tuple[str, str, str]] = []
+        for provider in self._provider_settings.providers:
+            catalog = cached.get(provider.name)
+            if catalog is not None:
+                if catalog.status != "ready":
+                    statuses.append((provider.name, catalog.status, catalog.message or ""))
+            elif provider.name in {"ollama", "lm-studio"}:
+                statuses.append((provider.name, "offline", "run /models to check the local server"))
+            elif not self._provider_is_usable(provider):
+                statuses.append((provider.name, "login_required", "run /login to configure credentials"))
+        return tuple(statuses)
+
+    @property
     def available_models(self) -> tuple[str, ...]:
         """Return model names for the active provider when it is usable."""
         if self._provider_settings is None:
