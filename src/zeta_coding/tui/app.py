@@ -2494,11 +2494,16 @@ class ModelPickerScreen(ModalScreen[ModelChoice | None]):
                             current_model=self.current_model,
                             current_provider=self.provider_name,
                             scoped=choice in self.scoped_choices,
+                            provider_heading=(
+                                index == 0
+                                or choice.provider_name
+                                != self.visible_choices[index - 1].provider_name
+                            ),
                         ),
                         markup=False,
                     )
                 )
-                for choice in self.visible_choices
+                for index, choice in enumerate(self.visible_choices)
             ]
         )
         self._reset_model_list_index()
@@ -6178,6 +6183,7 @@ def _model_picker_label(
     current_model: str,
     current_provider: str,
     scoped: bool = False,
+    provider_heading: bool = False,
 ) -> str:
     marker = (
         "* "
@@ -6185,7 +6191,9 @@ def _model_picker_label(
         else "  "
     )
     suffix = " [scoped]" if scoped else ""
-    return f"{marker}{choice.provider_name}:{choice.model}{suffix}"
+    if provider_heading:
+        return f"{choice.provider_name}\n{marker}  {choice.model}{suffix}"
+    return f"  {marker}{choice.model}{suffix}"
 
 
 def _filter_login_providers(
