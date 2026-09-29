@@ -41,7 +41,11 @@ from zeta_agent.tools import AgentTool
 from zeta_agent.types import JSONValue
 from zeta_ai.model_limits import ModelLimitsProvider, RuntimeModelLimits
 from zeta_coding.branch_summary import summarize_branch_messages_with_model
-from zeta_coding.model_catalog_cache import ModelCatalogCache, ModelCatalogCacheError
+from zeta_coding.model_catalog_cache import (
+    ModelCatalogCache,
+    ModelCatalogCacheError,
+    ProviderModelCatalog,
+)
 from zeta_coding.model_discovery import DiscoverySummary, ModelDiscoveryService
 from zeta_coding.commands import CommandRegistry, CommandResult, create_default_command_registry
 from zeta_coding.context import discover_project_context_with_diagnostics
@@ -281,6 +285,8 @@ class CodingSession:
         self._provider_settings = config.provider_settings
         self._runtime_provider_config = config.runtime_provider_config
         self._resource_paths = resource_paths_with_cwd(config.resource_paths, config.cwd)
+        self._model_catalog_cache = ModelCatalogCache()
+        self._model_catalogs = self._read_model_catalogs()
         self._auto_compact_token_threshold = config.auto_compact_token_threshold
         self._auto_compact_enabled = config.auto_compact_enabled
         self._thinking_level = _state_thinking_level(
@@ -442,10 +448,7 @@ class CodingSession:
         """Return configured providers and their latest discovery status."""
         if self._provider_settings is None:
             return ()
-        try:
-            cached = ModelCatalogCache().load()
-        except ModelCatalogCacheError:
-            cached = {}
+        cached = self._model_catalogs
         statuses: list[tuple[str, str, str]] = []
         for provider in self._provider_settings.providers:
             catalog = cached.get(provider.name)
@@ -1281,7 +1284,17 @@ class CodingSession:
         """Explicitly refresh configured provider model catalogs."""
         if self._provider_settings is None:
             raise ProviderConfigError("Provider settings are not available")
-        return await ModelDiscoveryService().refresh(self._provider_settings.providers)
+        summary = await ModelDiscoveryService(cache=self._model_catalog_cache).refresh(
+            self._provider_settings.providers
+        )
+        self._model_catalogs = {catalog.provider: catalog for catalog in summary.catalogs}
+        return summary
+
+    def _read_model_catalogs(self) -> dict[str, ProviderModelCatalog]:
+        try:
+            return dict(self._model_catalog_cache.load())
+        except ModelCatalogCacheError:
+            return {}
 
     def reload_provider_settings(self) -> None:
         """Reload provider settings for login and model-selection flows."""
@@ -1995,10 +2008,7 @@ class CodingSession:
 
     def _provider_is_usable(self, provider: ProviderConfig) -> bool:
         if provider.name in {"ollama", "lm-studio"}:
-            try:
-                cached = ModelCatalogCache().load().get(provider.name)
-            except ModelCatalogCacheError:
-                return False
+            cached = self._model_catalogs.get(provider.name)
             return cached is not None and cached.status == "ready"
         return provider_has_usable_credentials(
             provider,
@@ -2006,10 +2016,7 @@ class CodingSession:
         )
 
     def _models_for_provider(self, provider: ProviderConfig) -> tuple[str, ...]:
-        try:
-            cached = ModelCatalogCache().load().get(provider.name)
-        except ModelCatalogCacheError:
-            cached = None
+        cached = self._model_catalogs.get(provider.name)
         if cached is not None and cached.status == "ready" and cached.models:
             return cached.models
         return provider.models
