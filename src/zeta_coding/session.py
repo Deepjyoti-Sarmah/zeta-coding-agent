@@ -41,6 +41,11 @@ from zeta_agent.tools import AgentTool
 from zeta_agent.types import JSONValue
 from zeta_ai.model_limits import ModelLimitsProvider, RuntimeModelLimits
 from zeta_coding.branch_summary import summarize_branch_messages_with_model
+from zeta_coding.model_catalog import (
+    models_for_provider,
+    provider_can_run,
+    unavailable_provider_statuses,
+)
 from zeta_coding.model_catalog_cache import (
     ModelCatalogCache,
     ModelCatalogCacheError,
@@ -89,7 +94,6 @@ from zeta_coding.provider_config import (
     ProviderSettings,
     load_provider_settings,
     provider_default_thinking_level,
-    provider_has_usable_credentials,
     provider_model_supports_images,
     provider_thinking_levels,
     provider_thinking_unavailable_reason,
@@ -448,18 +452,11 @@ class CodingSession:
         """Return configured providers and their latest discovery status."""
         if self._provider_settings is None:
             return ()
-        cached = self._model_catalogs
-        statuses: list[tuple[str, str, str]] = []
-        for provider in self._provider_settings.providers:
-            catalog = cached.get(provider.name)
-            if catalog is not None:
-                if catalog.status != "ready":
-                    statuses.append((provider.name, catalog.status, catalog.message or ""))
-            elif provider.name in {"ollama", "lm-studio"}:
-                statuses.append((provider.name, "offline", "run /models to check the local server"))
-            elif not self._provider_is_usable(provider):
-                statuses.append((provider.name, "login_required", "run /login to configure credentials"))
-        return tuple(statuses)
+        return unavailable_provider_statuses(
+            self._provider_settings.providers,
+            catalogs=self._model_catalogs,
+            credentials=self._credential_store,
+        )
 
     @property
     def available_models(self) -> tuple[str, ...]:
@@ -2007,19 +2004,14 @@ class CodingSession:
         )
 
     def _provider_is_usable(self, provider: ProviderConfig) -> bool:
-        if provider.name in {"ollama", "lm-studio"}:
-            cached = self._model_catalogs.get(provider.name)
-            return cached is not None and cached.status == "ready"
-        return provider_has_usable_credentials(
+        return provider_can_run(
             provider,
-            credential_reader=self._credential_store,
+            catalogs=self._model_catalogs,
+            credentials=self._credential_store,
         )
 
     def _models_for_provider(self, provider: ProviderConfig) -> tuple[str, ...]:
-        cached = self._model_catalogs.get(provider.name)
-        if cached is not None and cached.status == "ready" and cached.models:
-            return cached.models
-        return provider.models
+        return models_for_provider(provider, catalogs=self._model_catalogs)
 
     def _usable_provider_configs(self) -> tuple[ProviderConfig, ...]:
         if self._provider_settings is None:
