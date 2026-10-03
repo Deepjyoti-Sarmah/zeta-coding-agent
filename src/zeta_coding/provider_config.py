@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
-from json import dumps, loads
+from json import dumps
 from os import environ
 from pathlib import Path
-from shutil import copy2
 from tempfile import NamedTemporaryFile
 from typing import Any, Protocol, cast
 
@@ -23,7 +22,21 @@ from zeta_ai.env import (
 from zeta_ai.openai_codex import DEFAULT_OPENAI_CODEX_BASE_URL
 from zeta_coding.catalog_loader import effective_catalog, save_user_catalog_entries
 from zeta_coding.credentials import FileCredentialStore, credentials_path
-from zeta_coding.oauth_registry import get_oauth_provider
+from zeta_coding.provider_catalog_merge import (
+    merge_model_metadata,
+    merge_provider_metadata,
+    unique_strings,
+)
+from zeta_coding.provider_model_resolution import validate_model
+from zeta_coding.provider_settings_io import (
+    load_settings,
+    save_settings,
+    settings_path,
+)
+from zeta_coding.provider_credentials import (
+    api_key_for_provider,
+    has_usable_credentials,
+)
 from zeta_coding.paths import ZetaPaths
 from zeta_coding.provider_catalog import (
     BUILTIN_PROVIDER_CATALOG,
@@ -490,33 +503,36 @@ def default_openai_provider_config() -> OpenAICompatibleProviderConfig:
 
 def provider_settings_path(paths: ZetaPaths | None = None) -> Path:
     """Return the durable provider settings path."""
-    return (paths or ZetaPaths()).home / "providers.json"
+    return settings_path(paths)
 
 
 def load_provider_settings(paths: ZetaPaths | None = None) -> ProviderSettings:
     """Load durable provider settings, falling back to env-compatible defaults."""
     resolved_paths = paths or ZetaPaths()
     path = provider_settings_path(resolved_paths)
-    if not path.exists():
-        return ProviderSettings(providers=_effective_provider_configs(resolved_paths))
-    raw = loads(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ProviderConfigError("Provider settings must be a JSON object")
-    settings = provider_settings_from_json(raw, paths=resolved_paths)
-    return _with_builtin_catalog_models(settings, paths=resolved_paths)
+    return load_settings(
+        path,
+        missing=lambda: ProviderSettings(providers=_effective_provider_configs(resolved_paths)),
+        parse=lambda raw: provider_settings_from_json(raw, paths=resolved_paths),
+        merge_builtins=lambda settings: _with_builtin_catalog_models(
+            settings, paths=resolved_paths
+        ),
+        invalid_message="Provider settings must be a JSON object",
+    )
 
 
 def save_provider_settings(settings: ProviderSettings, paths: ZetaPaths | None = None) -> Path:
     """Write durable provider preferences and return the path."""
     resolved_paths = paths or ZetaPaths()
-    _save_provider_definitions_to_catalog(settings, paths=resolved_paths)
     path = provider_settings_path(resolved_paths)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        with suppress(OSError):
-            copy2(path, path.with_suffix(path.suffix + ".bak"))
-    _atomic_write_text(path, dumps(settings.to_json(), indent=2, sort_keys=True) + "\n")
-    return path
+    return save_settings(
+        settings,
+        path,
+        persist_catalog=lambda: _save_provider_definitions_to_catalog(
+            settings, paths=resolved_paths
+        ),
+        serialize=lambda value: dumps(value.to_json(), indent=2, sort_keys=True) + "\n",
+    )
 
 
 def save_default_provider_model(
@@ -805,7 +821,7 @@ def _merge_openai_compatible_provider(
     existing: OpenAICompatibleProviderConfig,
     incoming: OpenAICompatibleProviderConfig,
 ) -> OpenAICompatibleProviderConfig:
-    models = _unique_strings((*incoming.models, *existing.models))
+    models = unique_strings((*incoming.models, *existing.models))
     return replace(
         incoming,
         models=models,
@@ -850,7 +866,7 @@ def _merge_anthropic_provider(
     existing: AnthropicProviderConfig,
     incoming: AnthropicProviderConfig,
 ) -> AnthropicProviderConfig:
-    models = _unique_strings((*incoming.models, *existing.models))
+    models = unique_strings((*incoming.models, *existing.models))
     return replace(
         incoming,
         models=models,
@@ -895,33 +911,14 @@ def _merge_provider_model_metadata(
     incoming: dict[str, ProviderModelMetadata],
     existing: dict[str, ProviderModelMetadata],
 ) -> dict[str, ProviderModelMetadata]:
-    merged = dict(incoming)
-    for model, metadata in existing.items():
-        if model not in merged:
-            merged[model] = metadata
-            continue
-        base = merged[model]
-        merged[model] = replace(
-            base,
-            name=metadata.name or base.name,
-            api=metadata.api or base.api,
-            base_url=metadata.base_url or base.base_url,
-            reasoning=metadata.reasoning if metadata.reasoning is not None else base.reasoning,
-            input=metadata.input or base.input,
-            cost={**base.cost, **metadata.cost},
-            cost_tiers=metadata.cost_tiers or base.cost_tiers,
-            context_window=metadata.context_window or base.context_window,
-            max_tokens=metadata.max_tokens or base.max_tokens,
-            headers={**base.headers, **metadata.headers},
-            compat={**base.compat, **metadata.compat},
-            thinking_level_map={**base.thinking_level_map, **metadata.thinking_level_map},
-        )
-    return merged
+    return merge_model_metadata(incoming, existing, _merge_model_metadata_pair)
 
 
-def _unique_strings(values: tuple[str, ...]) -> tuple[str, ...]:
-    """Return values with duplicates removed while preserving order."""
-    return tuple(dict.fromkeys(values))
+def _merge_model_metadata_pair(
+    base: ProviderModelMetadata,
+    metadata: ProviderModelMetadata,
+) -> ProviderModelMetadata:
+    return merge_provider_metadata(base, metadata)
 
 
 def _atomic_write_text(path: Path, text: str) -> None:
@@ -1271,13 +1268,7 @@ def resolve_provider_selection(
 
 def validate_provider_model(provider: ProviderConfig, model: str) -> None:
     """Raise when ``model`` is not declared by ``provider``."""
-    if model in provider.models:
-        return
-    available = ", ".join(sorted(provider.models)) or "none"
-    raise ProviderConfigError(
-        f"Model is not configured for provider {provider.name}: {model}. "
-        f"Available models: {available}"
-    )
+    validate_model(provider, model, error=ProviderConfigError)
 
 
 def provider_thinking_levels(
@@ -1575,17 +1566,7 @@ def provider_has_usable_credentials(
     credential_reader: CredentialReader | None = None,
 ) -> bool:
     """Return whether Zeta can attempt calls for this provider without prompting setup."""
-    if provider.credential_name and credential_reader is not None:
-        get_oauth = getattr(credential_reader, "get_oauth", None)
-        if (
-            get_oauth_provider(provider.name) is not None
-            and get_oauth is not None
-            and get_oauth(provider.credential_name) is not None
-        ):
-            return True
-        if credential_reader.get(provider.credential_name):
-            return True
-    return bool(environ.get(provider.api_key_env))
+    return has_usable_credentials(provider, credential_reader=credential_reader)
 
 
 def _reasoning_effort_from_provider(
@@ -1866,23 +1847,7 @@ def _api_key_from_provider(
     *,
     credential_reader: CredentialReader | None,
 ) -> str:
-    if provider.credential_name and credential_reader is not None:
-        credential = credential_reader.get(provider.credential_name)
-        if credential:
-            return credential
-        get_oauth = getattr(credential_reader, "get_oauth", None)
-        if get_oauth_provider(provider.name) is not None and get_oauth is not None:
-            oauth_credential = get_oauth(provider.credential_name)
-            if oauth_credential is not None:
-                access = getattr(oauth_credential, "access", None)
-                if isinstance(access, str) and access:
-                    return access
-
-    api_key = environ.get(provider.api_key_env)
-    if api_key:
-        return api_key
-    credential_hint = f" or run /login {provider.name}" if provider.credential_name else ""
-    raise RuntimeError(f"Missing provider API key. Set {provider.api_key_env}{credential_hint}.")
+    return api_key_for_provider(provider, credential_reader=credential_reader)
 
 
 def _validate_provider_numbers(
