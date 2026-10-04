@@ -33,6 +33,12 @@ from textual.widgets.markdown import MarkdownBlock, MarkdownStream
 from zeta_agent.tools import AgentTool
 from zeta_coding.prompt_templates import PromptTemplate
 from zeta_coding.session_stats import SessionStats
+from zeta_coding.tui.status_widgets import (
+    cache_status_text as _cache_status,
+    compact_status_line as _compact_status_line,
+    context_summary as _context_summary,
+    cost_status_text as _cost_status,
+)
 from zeta_coding.skills import Skill
 from zeta_coding.system_prompt import ProjectContextFile
 from zeta_coding.tui.autocomplete import CompletionState
@@ -1582,7 +1588,7 @@ def render_compact_session_info(
     right.append(" ")
     right.append(f"({_thinking_level(session)})", style=theme.completion_description)
     right.append("\n")
-    right.append(_context_usage(session), style=theme.completion_description)
+    right.append(_compact_status_line(session), style=theme.completion_description)
 
     table = Table.grid(expand=True)
     table.add_column(ratio=1)
@@ -1990,11 +1996,6 @@ def _append_plain(
 def _plain_text(text: str, *, body_style: str) -> Text:
     return Text(text, style=body_style, overflow="fold", no_wrap=False)
 
-
-def _context_usage(session: SessionSummarySource) -> str:
-    threshold = session.auto_compact_token_threshold
-    limit = session.context_window_tokens if threshold is None or threshold <= 0 else threshold
-    return f"{_compact_token_count(session.context_token_estimate)}/{_compact_token_count(limit)}"
 
 
 def _styled_cwd(cwd: Path, *, theme: TuiTheme) -> Text:

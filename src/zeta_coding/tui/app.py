@@ -4,7 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import traceback
-from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Mapping, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Coroutine,
+    Mapping,
+    Sequence,
+)
 from contextlib import suppress
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -137,6 +144,24 @@ from zeta_coding.tui.autocomplete import (
     CompletionState,
     build_completion_state,
 )
+from zeta_coding.tui.model_picker_screen import ModelPickerScreen, ModelPickerSearchInput
+from zeta_coding.tui.login_helpers import (
+    api_key_login_providers as _api_key_login_providers,
+    credential_store_has_entry as _credential_store_has_entry,
+    filter_login_providers as _filter_login_providers,
+    login_provider_label as _login_provider_label,
+    stored_credential_providers as _stored_credential_providers,
+    subscription_login_providers as _subscription_login_providers,
+)
+from zeta_coding.tui.command_output import (
+    message_uses_notification as _command_message_uses_notification,
+    message_uses_transcript as _command_message_uses_transcript,
+    output_title as _command_output_title,
+)
+from zeta_coding.tui.model_picker import (
+    filter_model_choices as _filter_model_choices,
+    model_choice_label as _model_picker_label,
+)
 from zeta_coding.tui.config import (
     ZETA_DARK_THEME,
     TuiKeybindings,
@@ -246,7 +271,9 @@ class _TuiExtensionUiBridge:
     ) -> str | None:
         """Show a modal picker; return the choice, or None on cancel/timeout."""
         theme = self._app.tui_settings.resolved_theme
-        screen: ModalScreen[str | None] = ExtensionSelectScreen(title, options, theme=theme)
+        screen: ModalScreen[str | None] = ExtensionSelectScreen(
+            title, options, theme=theme
+        )
         return await self._run_dialog(screen, default=None, timeout=timeout)
 
     async def confirm(
@@ -270,7 +297,9 @@ class _TuiExtensionUiBridge:
     ) -> str | None:
         """Show a modal text prompt; return the text, or None on cancel/timeout."""
         theme = self._app.tui_settings.resolved_theme
-        screen: ModalScreen[str | None] = ExtensionInputScreen(title, placeholder, theme=theme)
+        screen: ModalScreen[str | None] = ExtensionInputScreen(
+            title, placeholder, theme=theme
+        )
         return await self._run_dialog(screen, default=None, timeout=timeout)
 
     # -- component seam -- pass-through to the app ----------------------------
@@ -505,7 +534,9 @@ class PromptInput(TextArea):
         self._bindings = BindingsMap.merge(
             [
                 self._base_bindings,
-                BindingsMap(_prompt_bindings(self.tui_keybindings, mode=self._footer_mode)),
+                BindingsMap(
+                    _prompt_bindings(self.tui_keybindings, mode=self._footer_mode)
+                ),
             ]
         )
 
@@ -658,7 +689,9 @@ class PromptInput(TextArea):
     def _show_large_paste_placeholder(self, content: str) -> None:
         """Store large pasted text and render a compact placeholder."""
         self._paste_placeholder_counter += 1
-        placeholder = self._large_paste_placeholder(content, self._paste_placeholder_counter)
+        placeholder = self._large_paste_placeholder(
+            content, self._paste_placeholder_counter
+        )
         self._pending_pastes.append((placeholder, content))
         self.insert(placeholder)
 
@@ -1017,13 +1050,17 @@ class ToolsReferenceScreen(ModalScreen[None]):
         """Compose the tool reference."""
         with Vertical(id="tools-reference"):
             yield Static("Available tools", id="tools-reference-title")
-            yield ToolsReferenceSearchInput(placeholder="Search tools", id="tools-reference-search")
+            yield ToolsReferenceSearchInput(
+                placeholder="Search tools", id="tools-reference-search"
+            )
             yield Static(
                 self._table_row("Tool", "Origin", "Description"),
                 id="tools-reference-header",
             )
             yield ListView(id="tools-reference-list")
-            yield Static("Enter opens description - Escape closes", id="tools-reference-help")
+            yield Static(
+                "Enter opens description - Escape closes", id="tools-reference-help"
+            )
 
     def on_mount(self) -> None:
         """Populate the list and focus search on open."""
@@ -1080,7 +1117,11 @@ class ToolsReferenceScreen(ModalScreen[None]):
         tool_list = self.query_one("#tools-reference-list", ListView)
         tool_list.clear()
         if not self.visible_tools:
-            message = "No tools available." if not self.tools else "No tools match your search."
+            message = (
+                "No tools available."
+                if not self.tools
+                else "No tools match your search."
+            )
             tool_list.append(ListItem(Label(message, markup=False), disabled=True))
             return
         tool_list.extend(
@@ -1194,7 +1235,8 @@ class PromptTemplatePickerScreen(ModalScreen[str | None]):
         with Vertical(id="prompt-template-picker"):
             yield Static("Prompt templates", id="prompt-template-picker-title")
             yield SessionPickerSearchInput(
-                placeholder="Search prompt templates", id="prompt-template-picker-search"
+                placeholder="Search prompt templates",
+                id="prompt-template-picker-search",
             )
             yield ListView(id="prompt-template-picker-list")
             yield Static("", id="prompt-template-picker-help")
@@ -1211,7 +1253,8 @@ class PromptTemplatePickerScreen(ModalScreen[str | None]):
         self.visible_templates = tuple(
             template
             for template in self.templates
-            if query in template.name.casefold() or query in (template.description or "").casefold()
+            if query in template.name.casefold()
+            or query in (template.description or "").casefold()
         )
         self._refresh_list()
 
@@ -1449,7 +1492,9 @@ class SkillPickerScreen(ModalScreen[SkillPickerResult | None]):
         Binding("down", "cursor_down", "Down", show=False, priority=True),
         Binding("enter", "select_cursor", "Insert", show=False, priority=True),
         Binding("f1", "show_description", "Description", show=False, priority=True),
-        Binding("ctrl+enter", "show_in_transcript", "Transcript", show=False, priority=True),
+        Binding(
+            "ctrl+enter", "show_in_transcript", "Transcript", show=False, priority=True
+        ),
     ]
 
     def __init__(self, skills: Sequence[Skill], *, theme: TuiTheme) -> None:
@@ -1461,7 +1506,9 @@ class SkillPickerScreen(ModalScreen[SkillPickerResult | None]):
     def compose(self) -> ComposeResult:
         with Vertical(id="skill-picker"):
             yield Static("Skills", id="skill-picker-title")
-            yield SkillPickerSearchInput(placeholder="Search skills", id="skill-picker-search")
+            yield SkillPickerSearchInput(
+                placeholder="Search skills", id="skill-picker-search"
+            )
             yield ListView(id="skill-picker-list")
             yield Static("", id="skill-picker-help")
 
@@ -1652,7 +1699,9 @@ class TreePickerScreen(ModalScreen[TreePickerResult | None]):
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Dismiss with the selected entry id."""
-        self.dismiss(TreePickerResult(entry_id=self._visible_choices()[event.index].entry_id))
+        self.dismiss(
+            TreePickerResult(entry_id=self._visible_choices()[event.index].entry_id)
+        )
 
     def action_cursor_up(self) -> None:
         """Move to the previous tree entry."""
@@ -1673,7 +1722,9 @@ class TreePickerScreen(ModalScreen[TreePickerResult | None]):
         if index is None:
             return
         self.dismiss(
-            TreePickerResult(entry_id=self._visible_choices()[index].entry_id, summarize=True)
+            TreePickerResult(
+                entry_id=self._visible_choices()[index].entry_id, summarize=True
+            )
         )
 
     def action_select_with_custom_summary(self) -> None:
@@ -1684,10 +1735,14 @@ class TreePickerScreen(ModalScreen[TreePickerResult | None]):
             return
         self.app.push_screen(
             BranchSummaryInstructionsScreen(theme=self.theme),
-            callback=lambda instructions: self._dismiss_with_custom_summary(index, instructions),
+            callback=lambda instructions: self._dismiss_with_custom_summary(
+                index, instructions
+            ),
         )
 
-    def _dismiss_with_custom_summary(self, index: int, instructions: str | None) -> None:
+    def _dismiss_with_custom_summary(
+        self, index: int, instructions: str | None
+    ) -> None:
         if instructions is None:
             return
         visible_choices = self._visible_choices()
@@ -1729,7 +1784,10 @@ class TreePickerScreen(ModalScreen[TreePickerResult | None]):
         return tuple(choice for choice in self.choices if not choice.is_tool_call)
 
     def _list_items(self) -> list[ListItem]:
-        return [_TreePickerListItem(choice, theme=self.theme) for choice in self._visible_choices()]
+        return [
+            _TreePickerListItem(choice, theme=self.theme)
+            for choice in self._visible_choices()
+        ]
 
     def _help_text(self) -> str:
         tool_call_state = "shown" if self.show_tool_calls else "hidden"
@@ -1780,7 +1838,9 @@ class BranchSummaryInstructionsScreen(ModalScreen[str | None]):
 
     def action_submit(self) -> None:
         """Submit custom instructions."""
-        value = self.query_one("#branch-summary-instructions-input", TextArea).text.strip()
+        value = self.query_one(
+            "#branch-summary-instructions-input", TextArea
+        ).text.strip()
         self.dismiss(value or None)
 
     def action_cancel(self) -> None:
@@ -1867,7 +1927,9 @@ class CommandOutputScreen(ModalScreen[None]):
 
     def action_scroll_down(self) -> None:
         """Scroll command output down."""
-        self.query_one("#command-output-scroll", CommandOutputScroll).action_scroll_down()
+        self.query_one(
+            "#command-output-scroll", CommandOutputScroll
+        ).action_scroll_down()
 
 
 class LoginProviderSearchInput(Input):
@@ -2203,7 +2265,9 @@ class ThemePickerScreen(ModalScreen[TuiThemeName | None]):
                 *[
                     ListItem(
                         Label(
-                            _theme_picker_label(theme_name, current_theme=self.current_theme),
+                            _theme_picker_label(
+                                theme_name, current_theme=self.current_theme
+                            ),
                             markup=False,
                         )
                     )
@@ -2255,288 +2319,9 @@ class ThemePickerScreen(ModalScreen[TuiThemeName | None]):
         self.dismiss(None)
 
 
-class ModelPickerSearchInput(Input):
-    """Search input that keeps model-picker control keys local to the picker."""
-
-    BINDINGS: ClassVar[list[BindingEntry]] = [
-        Binding("escape", "cancel", "Cancel", show=False, priority=True),
-        Binding("tab", "toggle_mode", "Mode", show=False, priority=True),
-        Binding("ctrl+i", "toggle_mode", "Mode", show=False, priority=True),
-        Binding("up", "cursor_up", "Up", show=False, priority=True),
-        Binding("down", "cursor_down", "Down", show=False, priority=True),
-    ]
-
-    def _picker(self) -> ModelPickerScreen:
-        return cast(ModelPickerScreen, self.screen)
-
-    def on_key(self, event: Key) -> None:
-        """Route picker control keys before the input edits its text."""
-        if event.key == "up":
-            event.stop()
-            event.prevent_default()
-            self.action_cursor_up()
-        elif event.key == "down":
-            event.stop()
-            event.prevent_default()
-            self.action_cursor_down()
-        elif event.key in {"tab", "ctrl+i"}:
-            event.stop()
-            event.prevent_default()
-            self.action_toggle_mode()
-        elif event.key == "escape":
-            event.stop()
-            event.prevent_default()
-            self.action_cancel()
-
-    def action_cursor_up(self) -> None:
-        """Move the model picker selection up."""
-        self._picker().action_cursor_up()
-
-    def action_cursor_down(self) -> None:
-        """Move the model picker selection down."""
-        self._picker().action_cursor_down()
-
-    def action_toggle_mode(self) -> None:
-        """Toggle between all and scoped picker modes."""
-        self._picker().action_toggle_mode()
-
-    def action_cancel(self) -> None:
-        """Close the model picker."""
-        self._picker().action_cancel()
-
-
-class ModelPickerScreen(ModalScreen[ModelChoice | None]):
-    """Model picker for the active TUI provider."""
-
-    BINDINGS: ClassVar[list[BindingEntry]] = [
-        Binding("escape", "cancel", "Cancel"),
-        Binding("tab", "toggle_mode", "Mode", show=False, priority=True),
-        Binding("ctrl+i", "toggle_mode", "Mode", show=False, priority=True),
-        Binding("up", "cursor_up", "Up", show=False),
-        Binding("down", "cursor_down", "Down", show=False),
-        Binding("enter", "accept_model", "Select", show=False),
-    ]
-
-    def __init__(
-        self,
-        choices: Sequence[ModelChoice],
-        *,
-        scoped_choices: Sequence[ModelChoice],
-        current_model: str,
-        provider_name: str,
-        theme: TuiTheme,
-        unavailable_providers: Sequence[tuple[str, str, str]] = (),
-        on_toggle_scoped: Callable[[ModelChoice], Sequence[ModelChoice]] | None = None,
-        picker_kind: Literal["model", "scoped"] = "model",
-    ) -> None:
-        super().__init__()
-        self.choices = tuple(dict.fromkeys(choices))
-        self.scoped_choices = tuple(dict.fromkeys(scoped_choices))
-        self.visible_choices = self.choices
-        self.current_model = current_model
-        self.provider_name = provider_name
-        self.theme = theme
-        self.unavailable_providers = tuple(unavailable_providers)
-        self.on_toggle_scoped = on_toggle_scoped
-        self.picker_kind = picker_kind
-        self.mode: Literal["all", "scoped"] = "all"
-        self.search_value = ""
-
-    def compose(self) -> ComposeResult:
-        """Compose the model picker."""
-        with Vertical(id="model-picker"):
-            title = (
-                f"Model: {self.provider_name}" if self.picker_kind == "model" else "Scoped models"
-            )
-            yield Static(title, id="model-picker-title")
-            yield Static("", id="model-picker-tabs")
-            if self.unavailable_providers:
-                yield Static(
-                    "\n".join(
-                        f"{name} [{status}] {message}".rstrip()
-                        for name, status, message in self.unavailable_providers
-                    ),
-                    id="model-picker-unavailable",
-                )
-            yield ModelPickerSearchInput(placeholder="Search models", id="model-picker-search")
-            yield ListView(
-                *[
-                    ListItem(
-                        Label(
-                            _model_picker_label(
-                                choice,
-                                current_model=self.current_model,
-                                current_provider=self.provider_name,
-                                scoped=choice in self.scoped_choices,
-                            ),
-                            markup=False,
-                        )
-                    )
-                    for choice in self.choices
-                ],
-                id="model-picker-list",
-            )
-            yield Static("", id="model-picker-help")
-
-    def on_mount(self) -> None:
-        """Focus the search field."""
-        search = self.query_one("#model-picker-search", Input)
-        search.focus()
-        self._refresh_model_list()
-
-    def on_input_changed(self, event: Input.Changed) -> None:
-        """Filter model choices as the search value changes."""
-        if event.input.id != "model-picker-search":
-            return
-        event.stop()
-        self.search_value = event.value
-        self._refresh_model_list()
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Select the highlighted model from the search field."""
-        if event.input.id != "model-picker-search":
-            return
-        event.stop()
-        self._select_visible_choice()
-
-    def _reset_model_list_index(self) -> None:
-        """Move selection to the current model or first visible row."""
-        model_list = self.query_one("#model-picker-list", ListView)
-        if not self.visible_choices:
-            model_list.index = None
-            return
-        try:
-            model_list.index = self.visible_choices.index(
-                ModelChoice(provider_name=self.provider_name, model=self.current_model)
-            )
-        except ValueError:
-            model_list.index = 0
-
-    def on_key(self, event: Key) -> None:
-        """Route model picker keys to the list."""
-        if event.key == "up":
-            event.stop()
-            self.action_cursor_up()
-        elif event.key == "down":
-            event.stop()
-            self.action_cursor_down()
-        elif event.key == "enter":
-            event.stop()
-            self.action_accept_model()
-        elif event.key in {"tab", "ctrl+i"}:
-            event.stop()
-            self.action_toggle_mode()
-
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Handle the selected row."""
-        event.stop()
-        self._select_visible_choice()
-
-    def action_cursor_up(self) -> None:
-        """Move to the previous model."""
-        self.query_one("#model-picker-list", ListView).action_cursor_up()
-
-    def action_cursor_down(self) -> None:
-        """Move to the next model."""
-        self.query_one("#model-picker-list", ListView).action_cursor_down()
-
-    def action_accept_model(self) -> None:
-        """Select the highlighted model."""
-        self._select_visible_choice()
-
-    def action_toggle_mode(self) -> None:
-        """Toggle between all models and scoped models."""
-        if self.picker_kind != "model":
-            return
-        self.mode = "scoped" if self.mode == "all" else "all"
-        self._refresh_model_list()
-
-    def action_toggle_scoped(self) -> None:
-        """Add or remove the highlighted model from scoped models."""
-        if self.on_toggle_scoped is None or not self.visible_choices:
-            return
-        model_list = self.query_one("#model-picker-list", ListView)
-        index = model_list.index
-        if index is None:
-            return
-        choice = self.visible_choices[index]
-        self.scoped_choices = tuple(dict.fromkeys(self.on_toggle_scoped(choice)))
-        self._refresh_model_list()
-
-    def action_cancel(self) -> None:
-        """Close without selecting a model."""
-        self.dismiss(None)
-
-    def _select_visible_choice(self) -> None:
-        if not self.visible_choices:
-            return
-        model_list = self.query_one("#model-picker-list", ListView)
-        index = model_list.index
-        if index is None:
-            return
-        choice = self.visible_choices[index]
-        if self.picker_kind == "scoped":
-            self.action_toggle_scoped()
-            return
-        self.dismiss(choice)
-
-    def _refresh_model_list(self) -> None:
-        base_choices = self.scoped_choices if self.mode == "scoped" else self.choices
-        self.visible_choices = _filter_model_choices(base_choices, self.search_value)
-        model_list = self.query_one("#model-picker-list", ListView)
-        model_list.clear()
-        model_list.extend(
-            [
-                ListItem(
-                    Label(
-                        _model_picker_label(
-                            choice,
-                            current_model=self.current_model,
-                            current_provider=self.provider_name,
-                            scoped=choice in self.scoped_choices,
-                            provider_heading=(
-                                index == 0
-                                or choice.provider_name
-                                != self.visible_choices[index - 1].provider_name
-                            ),
-                        ),
-                        markup=False,
-                    )
-                )
-                for index, choice in enumerate(self.visible_choices)
-            ]
-        )
-        self._reset_model_list_index()
-        scope_count = len(self.scoped_choices)
-        tabs = self.query_one("#model-picker-tabs", Static)
-        if self.picker_kind == "scoped":
-            tabs.update("Scoped models setup — Enter toggles membership; active model is unchanged")
-            help_text = (
-                "No matching models - Enter toggles scoped model"
-                if not self.visible_choices
-                else f"Enter toggles scoped model - {scope_count} scoped"
-            )
-        elif self.mode == "all":
-            tabs.update("Tabs: ● All models  ○ Scoped models")
-            help_text = (
-                "all models: no matching models - Tab switches to scoped models"
-                if not self.visible_choices
-                else (
-                    "All models - Enter selects active model - Tab switches tabs - "
-                    f"{scope_count} scoped"
-                )
-            )
-        else:
-            tabs.update("Tabs: ○ All models  ● Scoped models")
-            help_text = (
-                "scoped models: no matching models - Tab switches to all models"
-                if not self.visible_choices
-                else "Scoped models - Enter selects active model - Tab switches tabs"
-            )
-        self.query_one("#model-picker-help", Static).update(help_text)
-
-
-class CustomProviderLoginScreen(ModalScreen[CustomProviderLoginResult | _LoginFlowAction | None]):
+class CustomProviderLoginScreen(
+    ModalScreen[CustomProviderLoginResult | _LoginFlowAction | None]
+):
     """Prompt for adding an OpenAI-compatible custom provider."""
 
     BINDINGS: ClassVar[list[BindingEntry]] = [
@@ -2566,7 +2351,9 @@ class CustomProviderLoginScreen(ModalScreen[CustomProviderLoginResult | _LoginFl
                 "Short provider name is used in commands/config.",
                 id="custom-provider-help",
             )
-            yield Input(placeholder="Provider name/id, e.g. nebius", id="custom-provider-name")
+            yield Input(
+                placeholder="Provider name/id, e.g. nebius", id="custom-provider-name"
+            )
             yield Input(
                 placeholder="Display name shown in UI, e.g. Nebius AI Studio",
                 id="custom-provider-display-name",
@@ -2625,14 +2412,18 @@ class CustomProviderLoginScreen(ModalScreen[CustomProviderLoginResult | _LoginFl
         base_url = self._field("custom-provider-base-url", "Base URL")
         if base_url is None:
             return None
-        api_key_env = self._field("custom-provider-api-key-env", "API key environment variable")
+        api_key_env = self._field(
+            "custom-provider-api-key-env", "API key environment variable"
+        )
         if api_key_env is None:
             return None
         models_text = self._field("custom-provider-models", "Model ids")
         if models_text is None:
             return None
         models = tuple(
-            dict.fromkeys(item.strip() for item in models_text.split(",") if item.strip())
+            dict.fromkeys(
+                item.strip() for item in models_text.split(",") if item.strip()
+            )
         )
         if not models:
             self.query_one("#custom-provider-help", Static).update(
@@ -2652,7 +2443,9 @@ class CustomProviderLoginScreen(ModalScreen[CustomProviderLoginResult | _LoginFl
         api_key = self._field("custom-provider-api-key", "API key")
         if api_key is None:
             return None
-        display_name = self.query_one("#custom-provider-display-name", Input).value.strip()
+        display_name = self.query_one(
+            "#custom-provider-display-name", Input
+        ).value.strip()
         return CustomProviderLoginResult(
             provider_name=provider_name,
             display_name=display_name or provider_name,
@@ -2699,7 +2492,9 @@ class LoginScreen(ModalScreen[str | _LoginFlowAction | None]):
             yield Static(f"Login: {self.provider.display_name}", id="login-title")
             yield Static("Paste this provider's API key.", id="login-help")
             yield Input(placeholder="Paste API key", password=True, id="login-api-key")
-            yield Static("Enter saves - Escape goes back - Ctrl+D closes", id="login-footer")
+            yield Static(
+                "Enter saves - Escape goes back - Ctrl+D closes", id="login-footer"
+            )
 
     def on_mount(self) -> None:
         """Focus the API key field."""
@@ -2734,7 +2529,8 @@ class OAuthLoginScreen(ModalScreen[OAuthCredential | _LoginFlowAction | None]):
         provider: ProviderCatalogEntry,
         *,
         theme: TuiTheme,
-        login: Callable[[OAuthLoginCallbacks], Awaitable[OAuthCredential]] | None = None,
+        login: Callable[[OAuthLoginCallbacks], Awaitable[OAuthCredential]]
+        | None = None,
     ) -> None:
         super().__init__()
         self.provider = provider
@@ -2748,13 +2544,17 @@ class OAuthLoginScreen(ModalScreen[OAuthCredential | _LoginFlowAction | None]):
         """Compose the OAuth login prompt."""
         with Vertical(id="login-screen"):
             yield Static(f"Login: {self.provider.display_name}", id="login-title")
-            yield Static("Follow the provider instructions to complete login.", id="login-help")
+            yield Static(
+                "Follow the provider instructions to complete login.", id="login-help"
+            )
             yield Static("", id="login-oauth-url")
             yield Input(
                 placeholder="Paste redirect URL or authorization code",
                 id="login-oauth-code",
             )
-            yield Static("Enter submits - Escape goes back - Ctrl+D closes", id="login-footer")
+            yield Static(
+                "Enter submits - Escape goes back - Ctrl+D closes", id="login-footer"
+            )
 
     def on_mount(self) -> None:
         """Focus the manual-code field and start OAuth."""
@@ -2764,7 +2564,9 @@ class OAuthLoginScreen(ModalScreen[OAuthCredential | _LoginFlowAction | None]):
     async def _run_login(self) -> None:
         try:
             oauth_provider = get_oauth_provider(self.provider.name)
-            login = self._login or (oauth_provider.login if oauth_provider is not None else None)
+            login = self._login or (
+                oauth_provider.login if oauth_provider is not None else None
+            )
             if login is None:
                 raise RuntimeError(f"No OAuth implementation for {self.provider.name}")
             credential = await login(
@@ -3535,7 +3337,9 @@ class ZetaTuiApp(App[None]):
     async def on_mount(self) -> None:
         """Focus the prompt when the app starts."""
         prompt = self.query_one(PromptInput)
-        prompt.shell_mode_style = self.tui_settings.resolved_theme.role_styles["tool"].border
+        prompt.shell_mode_style = self.tui_settings.resolved_theme.role_styles[
+            "tool"
+        ].border
         self._sync_prompt_shell_mode(prompt.text)
         prompt.focus()
         self._update_responsive_layout(self.size.width, self.size.height)
@@ -3724,7 +3528,9 @@ class ZetaTuiApp(App[None]):
                 try:
                     summary = await self.session.refresh_model_catalogs()
                 except (OSError, ValueError) as exc:
-                    command = replace(command, message=f"Could not refresh model catalogs: {exc}")
+                    command = replace(
+                        command, message=f"Could not refresh model catalogs: {exc}"
+                    )
                 else:
                     command = replace(command, message=summary.format_message())
             if command.new_session_requested:
@@ -3837,7 +3643,9 @@ class ZetaTuiApp(App[None]):
         """Return whether compaction would race an active or queued agent turn."""
         self._sync_queue_state()
         worker = self._prompt_worker
-        is_worker_active = worker is not None and not worker.is_finished and not worker.is_cancelled
+        is_worker_active = (
+            worker is not None and not worker.is_finished and not worker.is_cancelled
+        )
         is_session_running = bool(getattr(self.session, "is_running", False))
         return (
             self.state.running
@@ -3886,7 +3694,9 @@ class ZetaTuiApp(App[None]):
             self._optimistic_user_messages.append((run_id, text))
             await self._append_optimistic_user_message(text)
         self._prompt_worker = self.run_worker(
-            self._run_prompt(text, run_id, source=source, custom_type=custom_type, details=details),
+            self._run_prompt(
+                text, run_id, source=source, custom_type=custom_type, details=details
+            ),
             exclusive=True,
         )
 
@@ -3922,11 +3732,17 @@ class ZetaTuiApp(App[None]):
             )
         self._refresh_chrome(theme=theme)
 
-    def _consume_optimistic_user_event(self, event: CodingSessionEvent, *, run_id: int) -> bool:
+    def _consume_optimistic_user_event(
+        self, event: CodingSessionEvent, *, run_id: int
+    ) -> bool:
         """Return whether a user event confirms an already-rendered optimistic message."""
-        if not isinstance(event, MessageEndEvent) or not isinstance(event.message, UserMessage):
+        if not isinstance(event, MessageEndEvent) or not isinstance(
+            event.message, UserMessage
+        ):
             return False
-        for index, (pending_run_id, pending_text) in enumerate(self._optimistic_user_messages):
+        for index, (pending_run_id, pending_text) in enumerate(
+            self._optimistic_user_messages
+        ):
             if pending_run_id == run_id and pending_text == event.message.content:
                 del self._optimistic_user_messages[index]
                 return True
@@ -3947,9 +3763,13 @@ class ZetaTuiApp(App[None]):
         prompt confirmation is the first user event of the run, so a queued
         steering/follow-up user message can never be mistaken for it.
         """
-        if not isinstance(event, MessageEndEvent) or not isinstance(event.message, UserMessage):
+        if not isinstance(event, MessageEndEvent) or not isinstance(
+            event.message, UserMessage
+        ):
             return False
-        for index, (pending_run_id, pending_text) in enumerate(self._optimistic_user_messages):
+        for index, (pending_run_id, pending_text) in enumerate(
+            self._optimistic_user_messages
+        ):
             if pending_run_id != run_id:
                 continue
             del self._optimistic_user_messages[index]
@@ -3965,7 +3785,9 @@ class ZetaTuiApp(App[None]):
     def _clear_optimistic_user_messages(self, *, run_id: int) -> None:
         """Drop unconfirmed optimistic messages once their run is no longer active."""
         self._optimistic_user_messages = [
-            pending for pending in self._optimistic_user_messages if pending[0] != run_id
+            pending
+            for pending in self._optimistic_user_messages
+            if pending[0] != run_id
         ]
 
     async def _append_confirmed_user_message(self, message: AgentMessage) -> None:
@@ -4036,7 +3858,9 @@ class ZetaTuiApp(App[None]):
         except NoMatches:
             return ""
 
-    def _register_extension_key_interceptor(self, handler: KeyInterceptor) -> Callable[[], None]:
+    def _register_extension_key_interceptor(
+        self, handler: KeyInterceptor
+    ) -> Callable[[], None]:
         """Register a pre-dispatch key interceptor; return an unsubscribe fn."""
         self._extension_key_interceptors.append(handler)
 
@@ -4124,15 +3948,22 @@ class ZetaTuiApp(App[None]):
             # extension needs no Textual import. A bare str is treated as one
             # line (never split into characters).
             lines = [content] if isinstance(content, str) else list(content)
-            factory = lambda _theme: self._string_slot_widget(lines)  # noqa: E731
+
+            def factory(_theme):
+                return self._string_slot_widget(lines)  # noqa: E731
+
         new_widget: Widget | None = None
         if factory is not None:
             try:
                 new_widget = factory(self.tui_settings.resolved_theme)
             except Exception as exc:  # noqa: BLE001 - isolation boundary
-                self._record_extension_component_failure(f"slot:{key}", exc, notify=True)
+                self._record_extension_component_failure(
+                    f"slot:{key}", exc, notify=True
+                )
                 return
-        slot_id = "above-prompt-slot" if placement == "above_prompt" else "below-prompt-slot"
+        slot_id = (
+            "above-prompt-slot" if placement == "above_prompt" else "below-prompt-slot"
+        )
         if new_widget is None:
             self._extension_slot_widgets.pop(key, None)
             self._extension_slot_slot_ids.pop(key, None)
@@ -4168,7 +3999,9 @@ class ZetaTuiApp(App[None]):
                 if self._extension_slot_widgets.get(key) is target:
                     self._extension_slot_widgets.pop(key, None)
                     self._extension_slot_slot_ids.pop(key, None)
-                self._record_extension_component_failure(f"slot:{key}", exc, notify=True)
+                self._record_extension_component_failure(
+                    f"slot:{key}", exc, notify=True
+                )
                 return
             self._extension_slot_mounted[key] = target
 
@@ -4219,7 +4052,10 @@ class ZetaTuiApp(App[None]):
             # Re-read after the await.
             target = self._extension_main_view
             target_widget = target.widget if target is not None else None
-            if target_widget is not None and self._extension_main_view_mounted is not target_widget:
+            if (
+                target_widget is not None
+                and self._extension_main_view_mounted is not target_widget
+            ):
                 try:
                     slot = self.query_one("#main-slot", Container)
                     slot.mount(target_widget)
@@ -4227,14 +4063,19 @@ class ZetaTuiApp(App[None]):
                     if self._extension_main_view is target:
                         self._extension_main_view = None
                     self._release_main_view_handle(target)
-                    self._record_extension_component_failure("main_view", exc, notify=True)
+                    self._record_extension_component_failure(
+                        "main_view", exc, notify=True
+                    )
                     self._restore_main_transcript()
                     return
                 self._extension_main_view_mounted = target_widget
                 with suppress(NoMatches):
                     self.query_one("#transcript", TranscriptView).display = False
                 slot.display = True
-            elif self._extension_main_view is None and self._extension_main_view_mounted is None:
+            elif (
+                self._extension_main_view is None
+                and self._extension_main_view_mounted is None
+            ):
                 # A close (target cleared) with nothing left to show.
                 self._restore_main_transcript()
 
@@ -4331,7 +4172,9 @@ class ZetaTuiApp(App[None]):
                 widgets.append(main_widget)
         return tuple(widgets)
 
-    def _extension_root_for(self, widget: Widget, tracked: tuple[Widget, ...]) -> Widget | None:
+    def _extension_root_for(
+        self, widget: Widget, tracked: tuple[Widget, ...]
+    ) -> Widget | None:
         """Return the tracked extension root that owns ``widget``, if any."""
         node: Widget | None = widget
         while node is not None:
@@ -4375,7 +4218,8 @@ class ZetaTuiApp(App[None]):
         with suppress(Exception):
             culprit.disabled = True
         if (
-            self._extension_main_view is not None and self._extension_main_view.widget is culprit
+            self._extension_main_view is not None
+            and self._extension_main_view.widget is culprit
         ) or self._extension_main_view_mounted is culprit:
             if self._extension_main_view_mounted is culprit:
                 self._extension_main_view_mounted = None
@@ -4392,7 +4236,9 @@ class ZetaTuiApp(App[None]):
                     tracker.pop(key, None)
             with suppress(Exception):
                 culprit.remove()
-        self._record_extension_component_failure(f"render:{id(culprit)}", error, notify=True)
+        self._record_extension_component_failure(
+            f"render:{id(culprit)}", error, notify=True
+        )
         return True
 
     def _handle_exception(self, error: Exception) -> None:
@@ -4424,7 +4270,9 @@ class ZetaTuiApp(App[None]):
         with suppress(Exception):
             self.log.error(
                 f"Extension component failed ({context}):\n"
-                + "".join(traceback.format_exception(type(error), error, error.__traceback__))
+                + "".join(
+                    traceback.format_exception(type(error), error, error.__traceback__)
+                )
             )
         if context in self._extension_component_failures_reported:
             return
@@ -4434,7 +4282,9 @@ class ZetaTuiApp(App[None]):
             if len(summary) > 120:
                 summary = summary[:117] + "..."
             self._notify(
-                f"An extension component failed ({context}) and was removed ({summary}).",
+                f"An extension component failed ({context}) and was removed ({
+                    summary
+                }).",
                 severity="error",
             )
 
@@ -4445,7 +4295,9 @@ class ZetaTuiApp(App[None]):
         with suppress(NoMatches):
             self.query_one("#transcript", TranscriptView).follow_output()
 
-    async def _run_terminal_command(self, command: str, *, add_to_context: bool) -> None:
+    async def _run_terminal_command(
+        self, command: str, *, add_to_context: bool
+    ) -> None:
         run_terminal_command = getattr(self.session, "run_terminal_command", None)
         if not callable(run_terminal_command):
             self._notify("Terminal commands are not available.", severity="error")
@@ -4531,7 +4383,9 @@ class ZetaTuiApp(App[None]):
     ) -> None:
         """Queue a prompt for the active agent worker."""
         try:
-            async for event in self.session.prompt(text, streaming_behavior=streaming_behavior):
+            async for event in self.session.prompt(
+                text, streaming_behavior=streaming_behavior
+            ):
                 self.adapter.apply(event)
         except Exception as exc:  # noqa: BLE001 - surface queueing failures in the TUI
             self._notify(f"Could not queue message: {exc}", severity="error")
@@ -4559,7 +4413,9 @@ class ZetaTuiApp(App[None]):
                     self._sync_text_selection_state()
                     self._refresh_chrome()
                     continue
-                if self._replace_transformed_optimistic_user_message(event, run_id=active_run_id):
+                if self._replace_transformed_optimistic_user_message(
+                    event, run_id=active_run_id
+                ):
                     self._sync_text_selection_state()
                     continue
                 if not (_is_user_message_end_event(event) and self.screen_stack):
@@ -4589,7 +4445,9 @@ class ZetaTuiApp(App[None]):
             if active_run_id == self._prompt_run_id:
                 self._prompt_worker = None
 
-    async def _apply_streaming_transcript_event(self, event: CodingSessionEvent) -> None:
+    async def _apply_streaming_transcript_event(
+        self, event: CodingSessionEvent
+    ) -> None:
         """Apply an agent event to mounted transcript widgets without full redraws."""
         if not self.screen_stack:
             self._refresh()
@@ -4642,7 +4500,9 @@ class ZetaTuiApp(App[None]):
                         and bool(block.thinking)
                     )
                 ]
-                canonical_items = self.state.items[-len(visible_blocks) :] if visible_blocks else []
+                canonical_items = (
+                    self.state.items[-len(visible_blocks) :] if visible_blocks else []
+                )
                 if (
                     any(isinstance(block, ThinkingContent) for block in visible_blocks)
                     or len(visible_blocks) > 1
@@ -4678,13 +4538,17 @@ class ZetaTuiApp(App[None]):
             await transcript.finish_assistant_message()
             updated_item = self.state.find_tool_item(event.tool_call_id)
             if updated_item is not None:
-                expanded = self.state.show_tool_results or updated_item.always_show_tool_result
+                expanded = (
+                    self.state.show_tool_results or updated_item.always_show_tool_result
+                )
                 await transcript.update_item(
                     updated_item,
                     theme=theme,
                     show_tool_results=expanded,
                     invocation=self.state.resolve_tool_invocation(updated_item),
-                    result_markup=self.state.resolve_tool_result(updated_item, expanded=expanded),
+                    result_markup=self.state.resolve_tool_result(
+                        updated_item, expanded=expanded
+                    ),
                 )
             self._refresh_chrome()
             return
@@ -4701,13 +4565,17 @@ class ZetaTuiApp(App[None]):
         if isinstance(event, ToolExecutionEndEvent):
             updated_item = self.state.find_tool_item(event.tool_call_id)
             if updated_item is not None:
-                expanded = self.state.show_tool_results or updated_item.always_show_tool_result
+                expanded = (
+                    self.state.show_tool_results or updated_item.always_show_tool_result
+                )
                 await transcript.update_item(
                     updated_item,
                     theme=theme,
                     show_tool_results=expanded,
                     invocation=self.state.resolve_tool_invocation(updated_item),
-                    result_markup=self.state.resolve_tool_result(updated_item, expanded=expanded),
+                    result_markup=self.state.resolve_tool_result(
+                        updated_item, expanded=expanded
+                    ),
                 )
             self._refresh_chrome()
             return
@@ -4945,7 +4813,9 @@ class ZetaTuiApp(App[None]):
     def _open_skills_picker(self) -> None:
         """Open loaded-skill discovery."""
         self.push_screen(
-            SkillPickerScreen(self.session.skills, theme=self.tui_settings.resolved_theme),
+            SkillPickerScreen(
+                self.session.skills, theme=self.tui_settings.resolved_theme
+            ),
             callback=self._handle_skill_picker_result,
         )
 
@@ -4959,7 +4829,9 @@ class ZetaTuiApp(App[None]):
             prompt.text = ""
             self.state.add_item(
                 "status",
-                f"Skill: {result.skill.name} (not added to context)\n{result.skill.content}",
+                f"Skill: {result.skill.name} (not added to context)\n{
+                    result.skill.content
+                }",
             )
             self._refresh()
         prompt.move_cursor(_text_end_location(prompt.text))
@@ -4980,7 +4852,9 @@ class ZetaTuiApp(App[None]):
         """Toggle inline tool result details without rebuilding unrelated history."""
         expanded = self.state.toggle_tool_results()
         self.run_worker(self._update_tool_results_visibility(), exclusive=False)
-        self._notify("Tool results expanded." if expanded else "Tool results collapsed.")
+        self._notify(
+            "Tool results expanded." if expanded else "Tool results collapsed."
+        )
 
     async def _update_tool_results_visibility(self) -> None:
         transcript = self.query_one("#transcript", TranscriptView)
@@ -5028,7 +4902,9 @@ class ZetaTuiApp(App[None]):
             self._notify(f"Error: {exc}", severity="error")
             return
         if not choices:
-            self._notify("No session entries are available for branching.", severity="warning")
+            self._notify(
+                "No session entries are available for branching.", severity="warning"
+            )
             return
         self.push_screen(
             TreePickerScreen(choices, theme=self.tui_settings.resolved_theme),
@@ -5113,7 +4989,9 @@ class ZetaTuiApp(App[None]):
 
     def _append_command_message(self, command_text: str, message: str) -> None:
         """Append non-persistent command output to the visible transcript."""
-        self.state.add_item("status", f"{_command_output_title(command_text)}\n{message}")
+        self.state.add_item(
+            "status", f"{_command_output_title(command_text)}\n{message}"
+        )
 
     def _show_command_message(self, command_text: str, message: str) -> None:
         self.push_screen(
@@ -5121,7 +4999,8 @@ class ZetaTuiApp(App[None]):
                 _command_output_title(command_text),
                 message,
                 theme=self.tui_settings.resolved_theme,
-                auto_copy_selection=command_text.strip().split(maxsplit=1)[0] == "/session",
+                auto_copy_selection=command_text.strip().split(maxsplit=1)[0]
+                == "/session",
             )
         )
 
@@ -5145,7 +5024,9 @@ class ZetaTuiApp(App[None]):
             self._notify(f"Unknown login method: {method}", severity="error")
             return
         if not providers:
-            self._notify("No login providers are available for that method.", severity="warning")
+            self._notify(
+                "No login providers are available for that method.", severity="warning"
+            )
             return
         self.push_screen(
             LoginProviderPickerScreen(
@@ -5206,9 +5087,13 @@ class ZetaTuiApp(App[None]):
         )
         try:
             save_user_catalog_entries((catalog_entry,))
-            FileCredentialStore().set(provider.credential_name or provider.name, result.api_key)
+            FileCredentialStore().set(
+                provider.credential_name or provider.name, result.api_key
+            )
             settings = load_provider_settings()
-            updated = upsert_openai_compatible_provider(settings, provider, set_default=False)
+            updated = upsert_openai_compatible_provider(
+                settings, provider, set_default=False
+            )
             save_provider_settings(updated)
             self.session.reload_provider_settings()
             try:
@@ -5254,7 +5139,9 @@ class ZetaTuiApp(App[None]):
             return
         self.push_screen(
             LoginScreen(entry, theme=self.tui_settings.resolved_theme),
-            callback=lambda api_key: self._handle_api_key_login_navigation_result(entry, api_key),
+            callback=lambda api_key: self._handle_api_key_login_navigation_result(
+                entry, api_key
+            ),
         )
 
     def _handle_api_key_login_navigation_result(
@@ -5267,7 +5154,9 @@ class ZetaTuiApp(App[None]):
         else:
             self._handle_login_result(entry, result)
 
-    def _handle_login_result(self, entry: ProviderCatalogEntry, api_key: str | None) -> None:
+    def _handle_login_result(
+        self, entry: ProviderCatalogEntry, api_key: str | None
+    ) -> None:
         if api_key is None:
             return
         if entry.credential_name is None:
@@ -5343,7 +5232,9 @@ class ZetaTuiApp(App[None]):
             callback=self._handle_logout_provider_result,
         )
 
-    def _handle_logout_provider_result(self, provider_name: str | _LoginFlowAction | None) -> None:
+    def _handle_logout_provider_result(
+        self, provider_name: str | _LoginFlowAction | None
+    ) -> None:
         if isinstance(provider_name, str):
             self._logout(provider_name)
 
@@ -5475,7 +5366,22 @@ class ZetaTuiApp(App[None]):
             else:
                 set_model_choice(choice)
         except Exception as exc:  # noqa: BLE001 - surface model switch failures in the TUI
-            self._notify(f"Could not switch model: {exc}", severity="error")
+            status = next(
+                (
+                    status
+                    for provider, status, _message in self.session.provider_catalog_statuses
+                    if provider == choice.provider_name
+                ),
+                None,
+            )
+            if status == "login_required":
+                self._notify(
+                    f"{choice.provider_name} requires credentials. Choose a login method.",
+                    severity="warning",
+                )
+                self._open_login_picker()
+            else:
+                self._notify(f"Could not switch model: {exc}", severity="error")
             return
         self._refresh_chrome()
 
@@ -5703,7 +5609,9 @@ class ZetaTuiApp(App[None]):
                 _visible_completion_state(
                     self._completion_state,
                     max_lines=max_lines,
-                    width=max(suggestions.content_size.width or suggestions.size.width, 1),
+                    width=max(
+                        suggestions.content_size.width or suggestions.size.width, 1
+                    ),
                 ),
                 theme=self.tui_settings.resolved_theme,
             )
@@ -5723,7 +5631,9 @@ class ZetaTuiApp(App[None]):
         measured_limit = _completion_visible_line_limit(suggestions)
         if suggestions.size.height <= 0:
             if self._completion_visible_line_budget is None:
-                self._completion_visible_line_budget = self._initial_completion_line_budget()
+                self._completion_visible_line_budget = (
+                    self._initial_completion_line_budget()
+                )
             return self._completion_visible_line_budget
         self._completion_visible_line_budget = max(
             self._completion_visible_line_budget or measured_limit,
@@ -5745,7 +5655,9 @@ class ZetaTuiApp(App[None]):
                     reserved_rows += widget.outer_size.height
 
         available_rows = terminal_height - reserved_rows
-        terminal_fraction_rows = max(1, terminal_height // COMPLETION_INITIAL_TERMINAL_FRACTION)
+        terminal_fraction_rows = max(
+            1, terminal_height // COMPLETION_INITIAL_TERMINAL_FRACTION
+        )
         return max(
             1,
             min(COMPLETION_MAX_VISIBLE_LINES, available_rows, terminal_fraction_rows),
@@ -5788,7 +5700,9 @@ class ZetaTuiApp(App[None]):
 
     def _sync_prompt_shell_mode(self, text: str) -> None:
         prompt = self.query_one("#prompt", PromptInput)
-        prompt.shell_mode_style = self.tui_settings.resolved_theme.role_styles["tool"].border
+        prompt.shell_mode_style = self.tui_settings.resolved_theme.role_styles[
+            "tool"
+        ].border
         prompt.set_class(_is_terminal_command_prompt(text), "-shell-mode")
         prompt.refresh()
         self._apply_activity_indicator()
@@ -5926,7 +5840,10 @@ def _visible_completion_state(
             items=state.items[start:],
             selected_index=state.selected_index - start,
         )
-        if _completion_selected_render_line(candidate, width=width) < selected_line_limit:
+        if (
+            _completion_selected_render_line(candidate, width=width)
+            < selected_line_limit
+        ):
             break
         start += 1
 
@@ -5955,7 +5872,9 @@ def _visible_completion_state(
     )
 
 
-def _completion_selected_render_line(state: CompletionState, *, width: int | None = None) -> int:
+def _completion_selected_render_line(
+    state: CompletionState, *, width: int | None = None
+) -> int:
     """Return the rendered line number for the selected completion item."""
     line = 0
     has_rendered_text = False
@@ -5977,7 +5896,9 @@ def _completion_selected_render_line(state: CompletionState, *, width: int | Non
     return line
 
 
-def _completion_render_line_count(state: CompletionState, *, width: int | None = None) -> int:
+def _completion_render_line_count(
+    state: CompletionState, *, width: int | None = None
+) -> int:
     """Return how many lines the completion state renders into."""
     if not state.items:
         return 0
@@ -6079,7 +6000,8 @@ def _filter_session_records(
     return tuple(
         record
         for record in records
-        if normalized in (record.title or "").casefold() or normalized in record.model.casefold()
+        if normalized in (record.title or "").casefold()
+        or normalized in record.model.casefold()
     )
 
 
@@ -6109,7 +6031,9 @@ def _active_tree_choice_index(choices: Sequence[SessionTreeChoice]) -> int:
     return _tree_choice_index(choices, None)
 
 
-def _tree_choice_index(choices: Sequence[SessionTreeChoice], entry_id: str | None) -> int:
+def _tree_choice_index(
+    choices: Sequence[SessionTreeChoice], entry_id: str | None
+) -> int:
     if entry_id is not None:
         for index, choice in enumerate(choices):
             if choice.entry_id == entry_id:
@@ -6133,92 +6057,11 @@ def _named_session_title(title: str | None) -> str | None:
     return stripped
 
 
-def _login_provider_label(provider: ProviderCatalogEntry) -> str:
-    return f"{provider.display_name} — {provider.name}"
-
-
-def _subscription_login_providers(
-    providers: Sequence[ProviderCatalogEntry],
-) -> tuple[ProviderCatalogEntry, ...]:
-    provider_ids = oauth_provider_ids()
-    return tuple(provider for provider in providers if provider.name in provider_ids)
-
-
-def _api_key_login_providers(
-    providers: Sequence[ProviderCatalogEntry],
-) -> tuple[ProviderCatalogEntry, ...]:
-    return tuple(provider for provider in providers if "api_key" in provider.auth_methods)
-
-
-def _stored_credential_providers(
-    providers: Sequence[ProviderCatalogEntry],
-) -> tuple[ProviderCatalogEntry, ...]:
-    credential_store = FileCredentialStore()
-    return tuple(
-        provider
-        for provider in providers
-        if provider.credential_name is not None
-        and _credential_store_has_entry(credential_store, provider.credential_name)
-    )
-
-
-def _credential_store_has_entry(
-    credential_store: FileCredentialStore,
-    credential_name: str,
-) -> bool:
-    return (
-        credential_store.get(credential_name) is not None
-        or credential_store.get_oauth(credential_name) is not None
-    )
-
-
-def _theme_picker_label(theme_name: TuiThemeName, *, current_theme: TuiThemeName) -> str:
+def _theme_picker_label(
+    theme_name: TuiThemeName, *, current_theme: TuiThemeName
+) -> str:
     marker = "✓" if theme_name == current_theme else " "
     return f"{marker} {theme_name}"
-
-
-def _model_picker_label(
-    choice: ModelChoice,
-    *,
-    current_model: str,
-    current_provider: str,
-    scoped: bool = False,
-    provider_heading: bool = False,
-) -> str:
-    marker = (
-        "* "
-        if (choice.provider_name == current_provider and choice.model == current_model)
-        else "  "
-    )
-    suffix = " [scoped]" if scoped else ""
-    if provider_heading:
-        return f"{choice.provider_name}\n{marker}  {choice.model}{suffix}"
-    return f"  {marker}{choice.model}{suffix}"
-
-
-def _filter_login_providers(
-    providers: Sequence[ProviderCatalogEntry],
-    query: str,
-) -> tuple[ProviderCatalogEntry, ...]:
-    normalized = query.strip().casefold()
-    if not normalized:
-        return tuple(providers)
-    return tuple(
-        provider
-        for provider in providers
-        if normalized in provider.name.casefold() or normalized in provider.display_name.casefold()
-    )
-
-
-def _filter_model_choices(choices: Sequence[ModelChoice], query: str) -> tuple[ModelChoice, ...]:
-    normalized = query.strip().lower()
-    if not normalized:
-        return tuple(choices)
-    return tuple(
-        choice
-        for choice in choices
-        if normalized in choice.provider_name.lower() or normalized in choice.model.lower()
-    )
 
 
 def _is_complete_slash_command(text: str, session: CodingSession) -> bool:
@@ -6230,23 +6073,6 @@ def _is_complete_slash_command(text: str, session: CodingSession) -> bool:
     if not name or ":" in name:
         return False
     return _session_command_registry(session).get(name) is not None
-
-
-def _command_message_uses_transcript(command_text: str) -> bool:
-    """Return whether slash-command output should appear inline in the transcript."""
-    command_name = command_text.split(maxsplit=1)[0].casefold()
-    return command_name in {"/reload", "/system"}
-
-
-def _command_message_uses_notification(command_text: str, message: str) -> bool:
-    """Return whether slash-command output should appear as a notification."""
-    command_name = command_text.split(maxsplit=1)[0].casefold()
-    return command_name == "/name" and message.startswith("Session renamed: ")
-
-
-def _command_output_title(command_text: str) -> str:
-    command_name = command_text.split(maxsplit=1)[0].removeprefix("/")
-    return f"/{command_name or 'help'}"
 
 
 def _is_thinking_cycle_key(key: str, configured_key: str) -> bool:
@@ -6411,11 +6237,18 @@ def _prompt_bindings(
             ),
             Binding(keybindings.cancel, "cancel", "Close", priority=True),
         ]
-        return bindings + _hidden_prompt_bindings(keybindings, visible_bindings=bindings)
+        return bindings + _hidden_prompt_bindings(
+            keybindings, visible_bindings=bindings
+        )
     if mode == "running":
         bindings = [
             Binding("enter", "submit_prompt", "Steer", priority=True),
-            Binding(keybindings.queue_follow_up, "submit_follow_up", "Follow-up", priority=True),
+            Binding(
+                keybindings.queue_follow_up,
+                "submit_follow_up",
+                "Follow-up",
+                priority=True,
+            ),
             Binding(keybindings.cancel, "cancel", "Cancel", priority=True),
             Binding(
                 keybindings.toggle_thinking,
@@ -6430,13 +6263,24 @@ def _prompt_bindings(
                 priority=True,
             ),
         ]
-        return bindings + _hidden_prompt_bindings(keybindings, visible_bindings=bindings)
+        return bindings + _hidden_prompt_bindings(
+            keybindings, visible_bindings=bindings
+        )
     bindings = [
         Binding("enter", "submit_prompt", "Submit", priority=True),
         Binding("shift+enter", "insert_newline", "Newline", priority=True),
-        Binding(keybindings.command_palette, "open_command_palette", "Commands", priority=True),
-        Binding(keybindings.session_picker, "open_session_picker", "Sessions", priority=True),
-        Binding(keybindings.thinking_cycle, "cycle_thinking", "Thinking", priority=True),
+        Binding(
+            keybindings.command_palette,
+            "open_command_palette",
+            "Commands",
+            priority=True,
+        ),
+        Binding(
+            keybindings.session_picker, "open_session_picker", "Sessions", priority=True
+        ),
+        Binding(
+            keybindings.thinking_cycle, "cycle_thinking", "Thinking", priority=True
+        ),
         Binding(keybindings.model_cycle, "cycle_model", "Model", priority=True),
         Binding(
             keybindings.copy_message,
@@ -6454,7 +6298,9 @@ def _hidden_prompt_bindings(
     *,
     visible_bindings: Sequence[Binding],
 ) -> list[Binding]:
-    visible_keys = {key for binding in visible_bindings for key in binding.key.split(",")}
+    visible_keys = {
+        key for binding in visible_bindings for key in binding.key.split(",")
+    }
     candidates = (
         (keybindings.command_palette, "open_command_palette"),
         (keybindings.session_picker, "open_session_picker"),
@@ -6511,7 +6357,9 @@ def _attach_retry_hint_to_error(state: TuiState, message: AssistantMessage) -> N
             return
 
 
-def _attach_diagnostic_log_path_to_error(state: TuiState, session: CodingSession) -> None:
+def _attach_diagnostic_log_path_to_error(
+    state: TuiState, session: CodingSession
+) -> None:
     log_path = getattr(session, "last_diagnostic_log_path", None)
     if not isinstance(log_path, Path) or state.error is None:
         return
@@ -6562,7 +6410,9 @@ def _resolve_tui_startup_selection(
     explicit_resume: bool,
 ) -> ProviderSelection:
     if provider_name is not None or model is not None:
-        return resolve_provider_selection(settings, provider_name=provider_name, model=model)
+        return resolve_provider_selection(
+            settings, provider_name=provider_name, model=model
+        )
 
     if explicit_resume:
         record_selection = _selection_from_session_record(settings, record)
@@ -6583,12 +6433,16 @@ def _resolve_tui_startup_selection(
 def _first_usable_startup_selection(settings: Any) -> ProviderSelection | None:
     credential_store = FileCredentialStore()
     for provider in settings.providers:
-        if provider_has_usable_credentials(provider, credential_reader=credential_store):
+        if provider_has_usable_credentials(
+            provider, credential_reader=credential_store
+        ):
             return ProviderSelection(provider=provider, model=provider.default_model)
     return None
 
 
-def _selection_from_session_record(settings: Any, record: Any | None) -> ProviderSelection | None:
+def _selection_from_session_record(
+    settings: Any, record: Any | None
+) -> ProviderSelection | None:
     if record is None:
         return None
     record_model = getattr(record, "model", None)
@@ -6618,7 +6472,9 @@ def _selection_from_session_record(settings: Any, record: Any | None) -> Provide
     for provider in settings.providers:
         if record_model not in provider.models:
             continue
-        if not provider_has_usable_credentials(provider, credential_reader=credential_store):
+        if not provider_has_usable_credentials(
+            provider, credential_reader=credential_store
+        ):
             continue
         return ProviderSelection(provider=provider, model=record_model)
     return None
@@ -6634,7 +6490,9 @@ def _usable_scoped_startup_choices(settings: Any) -> tuple[ModelChoice, ...]:
             continue
         if item.model not in provider.models:
             continue
-        if not provider_has_usable_credentials(provider, credential_reader=credential_store):
+        if not provider_has_usable_credentials(
+            provider, credential_reader=credential_store
+        ):
             continue
         choices.append(ModelChoice(provider_name=item.provider, model=item.model))
     return tuple(choices)
