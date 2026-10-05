@@ -473,12 +473,12 @@ class CodingSession:
 
     @property
     def available_model_choices(self) -> tuple[ModelChoice, ...]:
-        """Return provider/model choices Zeta can call with available credentials."""
+        """Return all configured provider/model choices for the model picker."""
         if self._provider_settings is None:
             return (ModelChoice(provider_name=self._provider_name, model=self.model),)
         return tuple(
             ModelChoice(provider_name=provider.name, model=model)
-            for provider in self._usable_provider_configs()
+            for provider in self._provider_settings.providers
             for model in self._models_for_provider(provider)
         )
 

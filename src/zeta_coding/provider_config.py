@@ -1131,6 +1131,14 @@ def _providers_with_preferences(
             )
         )
         seen.add(provider_name)
+
+    # Keep catalog providers visible even when the user has not configured them.
+    # The picker can then show their models and route selection to login/setup.
+    providers.extend(
+        provider
+        for name, provider in catalog_configs.items()
+        if name not in seen
+    )
     return tuple(providers)
 
 
