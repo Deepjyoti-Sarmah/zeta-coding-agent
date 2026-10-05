@@ -21,7 +21,15 @@ class SessionStats:
     tool_call_count: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_tokens: int = 0
     estimated_cost: float | None = None
+
+    @property
+    def cache_percentage(self) -> float | None:
+        """Return the cache-read share of prompt tokens when reported."""
+        if self.input_tokens <= 0 or self.cache_read_tokens <= 0:
+            return None
+        return self.cache_read_tokens / self.input_tokens * 100
 
 
 def calculate_session_stats(
@@ -34,6 +42,7 @@ def calculate_session_stats(
     tool_call_count = 0
     input_tokens = 0
     output_tokens = 0
+    cache_read_tokens = 0
     estimated_cost = 0.0
     has_billable_usage = False
     has_complete_pricing = True
@@ -53,6 +62,7 @@ def calculate_session_stats(
         prompt_tokens = usage.input + usage.cache_read + usage.cache_write
         input_tokens += prompt_tokens
         output_tokens += usage.output
+        cache_read_tokens += usage.cache_read
         if prompt_tokens == 0 and usage.output == 0:
             continue
 
@@ -77,6 +87,7 @@ def calculate_session_stats(
         tool_call_count=tool_call_count,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
+        cache_read_tokens=cache_read_tokens,
         estimated_cost=(estimated_cost if has_billable_usage and has_complete_pricing else None),
     )
 

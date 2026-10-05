@@ -10,6 +10,7 @@ from zeta_coding.command_parsing import (
     validate_session_name,
 )
 from zeta_coding.commands import create_default_command_registry
+from zeta_coding.session_stats import SessionStats
 
 
 class CommandParsingTests(unittest.TestCase):
@@ -31,6 +32,18 @@ class CommandParsingTests(unittest.TestCase):
     def test_validate_session_name_rejects_multiline_names(self) -> None:
         with self.assertRaises(ValueError):
             validate_session_name("first\nsecond")
+
+
+class SessionStatsTests(unittest.TestCase):
+    def test_cache_percentage_uses_prompt_tokens(self) -> None:
+        stats = SessionStats(input_tokens=1000, cache_read_tokens=820)
+
+        self.assertEqual(stats.cache_percentage, 82.0)
+
+    def test_cache_percentage_is_hidden_without_cache_reads(self) -> None:
+        stats = SessionStats(input_tokens=1000)
+
+        self.assertIsNone(stats.cache_percentage)
 
 
 class CommandRegistryTests(unittest.TestCase):
