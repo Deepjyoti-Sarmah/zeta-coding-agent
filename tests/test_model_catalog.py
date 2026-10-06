@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
@@ -12,6 +13,7 @@ from zeta_coding.model_catalog_cache import ModelCatalogCache, live_catalog
 from zeta_coding.model_discovery import ModelDiscoveryService
 from zeta_coding.paths import ZetaPaths
 from zeta_coding.provider_catalog_merge import merge_model_metadata, unique_strings
+from zeta_coding.provider_credentials import api_key_for_provider, has_usable_credentials
 from zeta_coding.provider_config import (
     ProviderConfigError,
     load_provider_settings,
@@ -76,6 +78,41 @@ class ProviderSettingsTests(unittest.TestCase):
 
             self.assertTrue((paths.home / "providers.json").exists())
             self.assertTrue((paths.home / "providers.json.bak").exists())
+
+
+class CredentialTests(unittest.TestCase):
+    def test_stored_credential_has_precedence_over_environment(self) -> None:
+        class Reader:
+            def get(self, name: str) -> str | None:
+                return "stored-key"
+
+        provider = type("Provider", (), {
+            "name": "test",
+            "credential_name": "test-credential",
+            "api_key_env": "TEST_CREDENTIAL_KEY",
+        })()
+        os.environ["TEST_CREDENTIAL_KEY"] = "environment-key"
+        try:
+            self.assertEqual(api_key_for_provider(provider, credential_reader=Reader()), "stored-key")
+            self.assertTrue(has_usable_credentials(provider, credential_reader=Reader()))
+        finally:
+            os.environ.pop("TEST_CREDENTIAL_KEY", None)
+
+    def test_environment_credential_is_used_when_store_is_empty(self) -> None:
+        class Reader:
+            def get(self, name: str) -> str | None:
+                return None
+
+        provider = type("Provider", (), {
+            "name": "test",
+            "credential_name": "test-credential",
+            "api_key_env": "TEST_CREDENTIAL_KEY",
+        })()
+        os.environ["TEST_CREDENTIAL_KEY"] = "environment-key"
+        try:
+            self.assertEqual(api_key_for_provider(provider, credential_reader=Reader()), "environment-key")
+        finally:
+            os.environ.pop("TEST_CREDENTIAL_KEY", None)
 
 
 class CatalogMergeHelperTests(unittest.TestCase):
