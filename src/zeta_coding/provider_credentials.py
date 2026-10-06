@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from os import environ
-from typing import Any, Protocol
+from typing import Protocol
 
 from zeta_coding.oauth_registry import get_oauth_provider
 
