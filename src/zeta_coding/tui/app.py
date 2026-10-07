@@ -3020,12 +3020,22 @@ class ZetaTuiApp(App[None]):
 
     #login-method-picker,
     #login-provider-picker,
-    #theme-picker,
-    #model-picker {
+    #theme-picker {
         width: 76;
         max-width: 90%;
         height: auto;
         max-height: 70%;
+        padding: 1 2;
+        background: $zeta-chrome-background;
+        color: $zeta-chrome-text;
+        border: tall $zeta-border;
+    }
+
+    #model-picker {
+        width: 76;
+        max-width: 90%;
+        height: auto;
+        max-height: 90%;
         padding: 1 2;
         background: $zeta-chrome-background;
         color: $zeta-chrome-text;
@@ -3048,12 +3058,25 @@ class ZetaTuiApp(App[None]):
         margin-bottom: 1;
     }
 
+    #model-picker-unavailable {
+        height: 1;
+        color: $zeta-muted-text;
+        margin-bottom: 1;
+    }
+
     #login-method-list,
     #login-provider-list,
-    #theme-picker-list,
-    #model-picker-list {
+    #theme-picker-list {
         height: auto;
         max-height: 12;
+        background: $zeta-transcript-background;
+        color: $zeta-screen-text;
+        border: tall $zeta-border;
+    }
+
+    #model-picker-list {
+        height: 1fr;
+        min-height: 4;
         background: $zeta-transcript-background;
         color: $zeta-screen-text;
         border: tall $zeta-border;
