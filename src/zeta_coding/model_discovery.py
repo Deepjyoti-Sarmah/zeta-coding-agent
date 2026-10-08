@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
 from os import environ
@@ -73,15 +74,24 @@ class ModelDiscoveryService:
         self._client = client
 
     async def refresh(self, providers: tuple[ProviderConfig, ...]) -> DiscoverySummary:
-        """Refresh all providers and persist live, fallback, and status data."""
+        """Refresh all providers concurrently and persist live, fallback, and status data.
+
+        Providers are independent, so they are queried concurrently. Doing this
+        sequentially multiplied the slowest timeout by the provider count, which
+        is what made an explicit refresh take seconds.
+        """
         previous = self.cache.load()
         owned_client = self._client is None
         client = self._client or httpx.AsyncClient(timeout=_DISCOVERY_TIMEOUT_SECONDS)
         try:
-            catalogs = [
-                await self._refresh_provider(provider, previous.get(provider.name), client)
-                for provider in providers
-            ]
+            catalogs = list(
+                await asyncio.gather(
+                    *(
+                        self._refresh_provider(provider, previous.get(provider.name), client)
+                        for provider in providers
+                    )
+                )
+            )
         finally:
             if owned_client:
                 await client.aclose()
