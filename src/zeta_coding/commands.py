@@ -13,7 +13,10 @@ from zeta_coding.command_registry import CommandRegistry
 from zeta_coding.command_types import CommandContext, SlashCommand
 from zeta_coding.command_parsing import parse_export_args, validate_session_name
 from zeta_coding.command_types import CommandResult
-from zeta_coding.provider_catalog import BUILTIN_PROVIDER_CATALOG, builtin_provider_entry
+from zeta_coding.provider_catalog import (
+    BUILTIN_PROVIDER_CATALOG,
+    builtin_provider_entry,
+)
 from zeta_coding.resources import ResourceDiagnostic
 from zeta_coding.session_manager import CodingSessionRecord, SessionManager
 from zeta_coding.skills import Skill
@@ -231,7 +234,7 @@ def create_default_command_registry() -> CommandRegistry:
         SlashCommand(
             name="models",
             usage="/models",
-            description="Refresh provider model catalogs.",
+            description="Choose a model and refresh provider catalogs in the background.",
             handler=_models_command,
         )
     )
@@ -410,7 +413,9 @@ def _context_command(context: CommandContext) -> CommandResult:
         lines = ["No project context files loaded."]
         if session.resource_diagnostics:
             lines.append("")
-            lines.extend(_format_diagnostics(session.resource_diagnostics, kind="context"))
+            lines.extend(
+                _format_diagnostics(session.resource_diagnostics, kind="context")
+            )
         return CommandResult(handled=True, message="\n".join(lines))
 
     lines = ["Active project context files:"]
@@ -486,7 +491,9 @@ def _name_command(context: CommandContext) -> CommandResult:
         title=name,
     )
     if updated is None:
-        return CommandResult(handled=True, message=f"Unknown current session: {session_id}")
+        return CommandResult(
+            handled=True, message=f"Unknown current session: {session_id}"
+        )
     return CommandResult(handled=True, message=f"Session renamed: {updated.title}")
 
 
@@ -521,7 +528,9 @@ def _model_command(context: CommandContext) -> CommandResult:
             models = ", ".join(sorted(available_models))
             return CommandResult(
                 handled=True,
-                message=f"Unknown model for provider {context.session.provider_name}: {model}\n"
+                message=f"Unknown model for provider {context.session.provider_name}: {
+                    model
+                }\n"
                 f"Available models: {models}",
             )
         context.session.set_model(model)
@@ -533,7 +542,13 @@ def _model_command(context: CommandContext) -> CommandResult:
 def _models_command(context: CommandContext) -> CommandResult:
     if context.args:
         return CommandResult(handled=True, message="Usage: /models")
-    return CommandResult(handled=True, model_catalog_refresh_requested=True)
+    # Open the picker straight away from the cached catalog; the refresh runs
+    # in the background and the open picker updates itself when it lands.
+    return CommandResult(
+        handled=True,
+        model_picker_requested=True,
+        model_catalog_refresh_requested=True,
+    )
 
 
 def _scoped_models_command(context: CommandContext) -> CommandResult:
@@ -558,7 +573,9 @@ def _thinking_command(context: CommandContext) -> CommandResult:
         return CommandResult(handled=True, message="\n".join(lines))
 
     if not available:
-        message = f"Thinking controls are unavailable for {session.provider_name}:{session.model}"
+        message = f"Thinking controls are unavailable for {session.provider_name}:{
+            session.model
+        }"
         reason = _thinking_unavailable_reason(session)
         if reason:
             message = f"{message}: {reason}"
@@ -638,7 +655,9 @@ def _login_command(context: CommandContext) -> CommandResult:
             return CommandResult(
                 handled=True,
                 message=(
-                    f"Unknown login provider: {provider_name}\nAvailable providers: {providers}"
+                    f"Unknown login provider: {provider_name}\nAvailable providers: {
+                        providers
+                    }"
                 ),
             )
         return CommandResult(
@@ -659,7 +678,9 @@ def _logout_command(context: CommandContext) -> CommandResult:
             return CommandResult(
                 handled=True,
                 message=(
-                    f"Unknown logout provider: {provider_name}\nAvailable providers: {providers}"
+                    f"Unknown logout provider: {provider_name}\nAvailable providers: {
+                        providers
+                    }"
                 ),
             )
         return CommandResult(handled=True, logout_provider=entry.name)
@@ -675,7 +696,11 @@ def _format_session_record(record: CodingSessionRecord) -> str:
 def _format_diagnostics(
     diagnostics: Sequence[ResourceDiagnostic], *, kind: str | None = None
 ) -> list[str]:
-    filtered = [diagnostic for diagnostic in diagnostics if kind is None or diagnostic.kind == kind]
+    filtered = [
+        diagnostic
+        for diagnostic in diagnostics
+        if kind is None or diagnostic.kind == kind
+    ]
     if not filtered:
         return ["Resource diagnostics: none"]
     lines = ["Resource diagnostics:"]

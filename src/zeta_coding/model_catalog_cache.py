@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from json import dumps, loads
 from pathlib import Path
@@ -14,6 +15,32 @@ from zeta_coding.paths import ZetaPaths
 CACHE_SCHEMA_VERSION = 1
 ProviderStatus = Literal["ready", "login_required", "offline", "error"]
 CatalogSource = Literal["live", "cached", "static"]
+
+#: How long a discovered catalog is considered fresh. Opening the model picker
+#: must not hit the network, so background refreshes are skipped until the
+#: cache is at least this old. An explicit reload forces a refresh regardless.
+MODEL_CATALOG_MAX_AGE_SECONDS = 3600.0
+
+
+def catalogs_are_fresh(
+    catalogs: Mapping[str, ProviderModelCatalog],
+    *,
+    max_age: float = MODEL_CATALOG_MAX_AGE_SECONDS,
+    now: float | None = None,
+) -> bool:
+    """Return whether cached catalogs are recent enough to skip a refresh.
+
+    A cache is fresh only when it holds at least one provider and every entry
+    carries a ``refreshed_at`` timestamp inside ``max_age``. Anything missing,
+    empty or stale means the caller should refresh.
+    """
+    if not catalogs:
+        return False
+    current = time() if now is None else now
+    refreshed = [catalog.refreshed_at for catalog in catalogs.values()]
+    if any(value is None for value in refreshed):
+        return False
+    return all(current - value < max_age for value in refreshed if value is not None)
 
 
 @dataclass(frozen=True, slots=True)

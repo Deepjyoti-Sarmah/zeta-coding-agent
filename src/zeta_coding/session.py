@@ -47,9 +47,11 @@ from zeta_coding.model_catalog import (
     unavailable_provider_statuses,
 )
 from zeta_coding.model_catalog_cache import (
+    MODEL_CATALOG_MAX_AGE_SECONDS,
     ModelCatalogCache,
     ModelCatalogCacheError,
     ProviderModelCatalog,
+    catalogs_are_fresh,
 )
 from zeta_coding.model_discovery import DiscoverySummary, ModelDiscoveryService
 from zeta_coding.commands import CommandRegistry, CommandResult, create_default_command_registry
@@ -1286,6 +1288,12 @@ class CodingSession:
         )
         self._model_catalogs = {catalog.provider: catalog for catalog in summary.catalogs}
         return summary
+
+    def model_catalogs_are_fresh(
+        self, *, max_age: float = MODEL_CATALOG_MAX_AGE_SECONDS
+    ) -> bool:
+        """Return whether cached model catalogs are recent enough to skip discovery."""
+        return catalogs_are_fresh(self._model_catalogs, max_age=max_age)
 
     def _read_model_catalogs(self) -> dict[str, ProviderModelCatalog]:
         try:

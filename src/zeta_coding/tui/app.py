@@ -33,6 +33,7 @@ from textual.screen import ModalScreen
 from textual.theme import Theme
 from textual.timer import Timer
 from textual.widget import Widget
+from textual.worker import Worker
 from textual.widgets import (
     Button,
     Input,
@@ -3211,6 +3212,8 @@ class ZetaTuiApp(App[None]):
         self._applying_settings_theme = False
         self._bindings = BindingsMap(_app_bindings(self.tui_settings.keybindings))
         self.session = session
+        self._model_picker_choices_cache: tuple[ModelChoice, ...] | None = None
+        self._model_catalog_refresh_worker: Worker | None = None
         self.state = TuiState(skills=session.skills)
         if startup_update_notice is not None:
             self.state.add_item("status", startup_update_notice, highlight="update")
@@ -3546,16 +3549,15 @@ class ZetaTuiApp(App[None]):
                 except ValueError as exc:
                     command = replace(command, message=f"Could not reload: {exc}")
                 else:
+                    self._invalidate_model_picker_choices()
+                    # A reload is the explicit "show me the new models" signal,
+                    # so bypass the freshness window and refetch.
+                    await self._refresh_model_catalogs_blocking()
                     command = replace(command, message=format_reload_summary(summary))
             if command.model_catalog_refresh_requested:
-                try:
-                    summary = await self.session.refresh_model_catalogs()
-                except (OSError, ValueError) as exc:
-                    command = replace(
-                        command, message=f"Could not refresh model catalogs: {exc}"
-                    )
-                else:
-                    command = replace(command, message=summary.format_message())
+                # Never block the picker on discovery: refresh in the background
+                # and let the picker render from the cache immediately.
+                self._schedule_model_catalog_refresh()
             if command.new_session_requested:
                 await self._new_session()
             if command.compact_summary is not None:
@@ -5292,17 +5294,21 @@ class ZetaTuiApp(App[None]):
         self._refresh()
 
     def _available_model_choices(self) -> tuple[ModelChoice, ...]:
+        if self._model_picker_choices_cache is not None:
+            return self._model_picker_choices_cache
         fallback_choices = (
             ModelChoice(provider_name=self.session.provider_name, model=model)
             for model in self.session.available_models
         )
-        return tuple(
+        choices = tuple(
             getattr(
                 self.session,
                 "available_model_choices",
                 fallback_choices,
             )
         )
+        self._model_picker_choices_cache = choices
+        return choices
 
     def _open_tools_reference(self) -> None:
         """Open a read-only view of tools from the active session."""
@@ -5314,6 +5320,49 @@ class ZetaTuiApp(App[None]):
             )
         )
 
+    def _invalidate_model_picker_choices(self) -> None:
+        self._model_picker_choices_cache = None
+
+    def _schedule_model_catalog_refresh(self, *, force: bool = False) -> None:
+        """Refresh model catalogs in the background without blocking the UI.
+
+        Concurrent refreshes share the single in-flight worker, and a cache that
+        is still fresh is left alone so opening the picker costs nothing.
+        """
+        worker = self._model_catalog_refresh_worker
+        if worker is not None and not worker.is_finished:
+            return
+        if not force and self.session.model_catalogs_are_fresh():
+            return
+        self._model_catalog_refresh_worker = self.run_worker(
+            self._refresh_model_catalogs(), exclusive=False, group="model-catalog-refresh"
+        )
+
+    async def _refresh_model_catalogs(self) -> None:
+        """Worker body for a background catalog refresh."""
+        try:
+            summary = await self.session.refresh_model_catalogs()
+        except (OSError, ValueError) as exc:
+            self._notify(f"Could not refresh model catalogs: {exc}", severity="warning")
+            return
+        self._invalidate_model_picker_choices()
+        screen = self.screen
+        if isinstance(screen, ModelPickerScreen):
+            # Keep an open picker in step with what discovery just found.
+            screen.apply_refreshed_choices(
+                self._available_model_choices(),
+                tuple(getattr(self.session, "provider_catalog_statuses", ())),
+            )
+            self._notify(
+                f"Model list updated - {summary.ready_count} providers ready."
+            )
+            return
+        self._notify(summary.format_message(), severity="information")
+
+    async def _refresh_model_catalogs_blocking(self) -> None:
+        """Await a catalog refresh, reporting failures without raising."""
+        await self._refresh_model_catalogs()
+
     def _open_model_picker(self) -> None:
         choices = self._available_model_choices()
         if not choices:
@@ -5322,6 +5371,8 @@ class ZetaTuiApp(App[None]):
                 severity="warning",
             )
             return
+        # Cache-first: the picker opens now, discovery catches up behind it.
+        self._schedule_model_catalog_refresh()
         self.push_screen(
             ModelPickerScreen(
                 choices,
